@@ -71,6 +71,7 @@
 </main>
 <script>
   let state = null;
+  let dirty = false;
   const base = location.pathname.endsWith('/') ? location.pathname : location.pathname + '/';
   const api = (path, options = {}) => fetch(base + path, { headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }, ...options });
   const $ = (id) => document.getElementById(id);
@@ -99,10 +100,17 @@
         <textarea class="cookies" placeholder="${account.hasCookies ? `已保存 ${account.cookieCount} 条 Cookie；留空则保留原值` : '请粘贴 Cookie-Editor 导出的 JSON 数组'}"></textarea>
       </div>`).join('');
     $('accounts').querySelectorAll('.remove').forEach((button) => button.addEventListener('click', (event) => {
-      state.config.accounts.splice(Number(event.target.closest('.account').dataset.index), 1); render();
+      state.config.accounts.splice(Number(event.target.closest('.account').dataset.index), 1);
+      dirty = true;
+      render();
     }));
-    const running = state.status && state.status.running;
-    $('status').textContent = running ? '运行中' : `空闲${state.status && state.status.exitCode !== null && state.status.exitCode !== undefined ? ` · 上次退出 ${state.status.exitCode}` : ''}`;
+    updateStatus();
+  }
+
+  function updateStatus() {
+    const status = (state && state.status) || {};
+    const running = Boolean(status.running);
+    $('status').textContent = running ? '运行中' : `空闲${status.exitCode !== null && status.exitCode !== undefined ? ` · 上次退出 ${status.exitCode}` : ''}`;
     $('status').className = running ? 'error' : 'muted';
   }
 
@@ -131,22 +139,41 @@
   async function refresh() {
     const response = await api('api/state');
     if (!response.ok) throw new Error(await response.text());
-    state = await response.json(); render();
+    const nextState = await response.json();
+    // Do not replace an account form while the user is editing it. The old
+    // behaviour made a newly added account disappear on the next poll before
+    // the user had a chance to save it.
+    if (!state || !dirty) {
+      state = nextState;
+      render();
+    } else {
+      state.status = nextState.status;
+      updateStatus();
+    }
     const logs = await api('api/log');
     if (logs.ok) $('logs').textContent = (await logs.json()).log || '暂无日志';
   }
 
-  $('addAccount').addEventListener('click', () => { state.config.accounts.push({ username: '', unique_id: '', targets: [], hasCookies: false, cookieCount: 0 }); render(); });
+  document.addEventListener('input', () => { dirty = true; });
+  $('addAccount').addEventListener('click', () => {
+    state.config.accounts.push({ username: '', unique_id: '', targets: [], hasCookies: false, cookieCount: 0 });
+    dirty = true;
+    render();
+  });
   $('refresh').addEventListener('click', () => refresh().catch((error) => say(error.message, true)));
   $('save').addEventListener('click', async () => {
     try {
       const response = await api('api/config', { method: 'POST', body: JSON.stringify(collect()) });
       if (!response.ok) throw new Error(await response.text());
-      state.config = (await response.json()).config; render(); say('配置已保存');
+      state.config = (await response.json()).config;
+      dirty = false;
+      render();
+      say('配置已保存');
     } catch (error) { say(error.message, true); }
   });
   $('run').addEventListener('click', async () => {
     try {
+      if (dirty) throw new Error('请先保存配置，再立即运行');
       const response = await api('api/run', { method: 'POST' });
       if (!response.ok) throw new Error(await response.text());
       say('任务已启动'); await refresh();
