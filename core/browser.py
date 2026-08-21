@@ -37,12 +37,16 @@ def get_browser():
             os.path.join(os.path.dirname(sys.executable), PLAYWRIGHT_BROWSERS_PATH)
         )
 
+    playwright = None
     try:
         # 启动浏览器
-        playwright = sync_playwright().start() 
+        playwright = sync_playwright().start()
         browser = playwright.chromium.launch(headless=headless)
         return playwright, browser
     except Exception as e:
+        if playwright is not None:
+            playwright.stop()
+
         # 捕获浏览器启动错误
         if "Executable doesn't exist" in str(e) and env != Environment.GITHUBACTION:
             print("浏览器可执行文件不存在！")
@@ -50,3 +54,4 @@ def get_browser():
             sys.exit(1)
         else:
             traceback.print_exc()
+            raise
