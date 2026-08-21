@@ -25,11 +25,19 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 INDEX_PATH = Path(__file__).resolve().parent / "static" / "index.html"
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+AUTH_ENABLED = str(os.getenv("AUTH_ENABLED", "true")).strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
 
 def require_auth(request: Request) -> None:
+    if not AUTH_ENABLED:
+        return
     if not ADMIN_PASSWORD:
         raise HTTPException(status_code=503, detail="ADMIN_PASSWORD 尚未配置")
     authorization = request.headers.get("Authorization", "")

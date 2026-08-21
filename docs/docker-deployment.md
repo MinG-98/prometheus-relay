@@ -17,7 +17,7 @@ systemctl enable --now douyin-fire-web.service
 systemctl enable --now douyin-fire.timer
 ```
 
-网页面板默认监听 `127.0.0.1:18081`，应通过 Caddy 或其他反向代理访问，不要直接暴露到公网。
+网页面板默认监听 `127.0.0.1:18081`，应通过 Caddy 或其他反向代理访问，不要直接暴露到公网。默认启用 Basic Auth；只有在入口已经由 VPN、IP 白名单或其他网关保护时，才应设置 `AUTH_ENABLED=false`。
 
 ## 网页配置
 
