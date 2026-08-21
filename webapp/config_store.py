@@ -20,7 +20,7 @@ DEFAULT_CONFIG = {
         "proxyAddress": "",
         "messageTemplate": "续火花",
         "hitokotoTypes": ["文学", "影视", "诗词", "哲学"],
-        "matchMode": "nickname",
+        "matchMode": "short_id",
         "browserTimeout": 120000,
         "friendListTimeout": 2000,
         "taskRetryTimes": 3,

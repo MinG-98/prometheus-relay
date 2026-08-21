@@ -41,7 +41,7 @@
   <div class="card">
     <h2>任务设置</h2>
     <div class="grid">
-      <div><label for="matchMode">匹配方式</label><select id="matchMode"><option value="nickname">昵称</option><option value="short_id">抖音号</option></select></div>
+      <div><label for="matchMode">匹配方式</label><select id="matchMode"><option value="short_id">抖音号（推荐）</option><option value="nickname">昵称</option></select></div>
       <div><label for="logLevel">日志级别</label><select id="logLevel"><option>Info</option><option>Debug</option><option>Warning</option><option>Error</option></select></div>
     </div>
     <label for="messageTemplate">消息模板</label>
@@ -94,8 +94,8 @@
           <div><label>用户名</label><input class="username" value="${escapeHtml(account.username)}"></div>
           <div><label>抖音号</label><input class="unique-id" value="${escapeHtml(account.unique_id)}"></div>
         </div>
-        <label>目标好友（逗号或换行分隔）</label>
-        <textarea class="targets">${escapeHtml((account.targets || []).join('\n'))}</textarea>
+        <label class="target-label">目标好友抖音号（逗号或换行分隔）</label>
+        <textarea class="targets" placeholder="每行填写一个好友抖音号">${escapeHtml((account.targets || []).join('\n'))}</textarea>
         <label>Cookie JSON</label>
         <textarea class="cookies" placeholder="${account.hasCookies ? `已保存 ${account.cookieCount} 条 Cookie；留空则保留原值` : '请粘贴 Cookie-Editor 导出的 JSON 数组'}"></textarea>
       </div>`).join('');
@@ -104,7 +104,18 @@
       dirty = true;
       render();
     }));
+    updateTargetLabels();
     updateStatus();
+  }
+
+  function updateTargetLabels() {
+    const shortIdMode = $('matchMode').value === 'short_id';
+    document.querySelectorAll('.target-label').forEach((label) => {
+      label.textContent = shortIdMode ? '目标好友抖音号（逗号或换行分隔）' : '目标好友昵称（逗号或换行分隔）';
+    });
+    document.querySelectorAll('.targets').forEach((textarea) => {
+      textarea.placeholder = shortIdMode ? '每行填写一个好友抖音号' : '每行填写一个好友原始昵称';
+    });
   }
 
   function updateStatus() {
@@ -155,6 +166,7 @@
   }
 
   document.addEventListener('input', () => { dirty = true; });
+  $('matchMode').addEventListener('change', () => { dirty = true; updateTargetLabels(); });
   $('addAccount').addEventListener('click', () => {
     state.config.accounts.push({ username: '', unique_id: '', targets: [], hasCookies: false, cookieCount: 0 });
     dirty = true;

@@ -36,7 +36,7 @@ def _task_environment(config: dict) -> dict:
             "PROXY_ADDRESS": settings.get("proxyAddress", ""),
             "MESSAGE_TEMPLATE": settings.get("messageTemplate", "续火花"),
             "HITOKOTO_TYPES": json.dumps(settings.get("hitokotoTypes", []), ensure_ascii=False),
-            "MATCH_MODE": settings.get("matchMode", "nickname"),
+            "MATCH_MODE": settings.get("matchMode", "short_id"),
             "BROWSER_TIMEOUT": str(settings.get("browserTimeout", 120000)),
             "FRIEND_LIST_WAIT_TIME": str(settings.get("friendListTimeout", 2000)),
             "TASK_RETRY_TIMES": str(settings.get("taskRetryTimes", 3)),
