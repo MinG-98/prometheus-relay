@@ -1,0 +1,21 @@
+services:
+  douyin-fire:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: douyin-fire:local
+    env_file:
+      - ${DOUYIN_ENV_FILE:-.env}
+    environment:
+      PYTHONUNBUFFERED: "1"
+    init: true
+    ipc: host
+    user: appuser
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - douyin_logs:/app/logs
+    restart: "no"
+
+volumes:
+  douyin_logs:

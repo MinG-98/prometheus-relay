@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Douyin Fire daily
+
+[Timer]
+OnCalendar=*-*-* 09:00:00 Asia/Shanghai
+Persistent=true
+RandomizedDelaySec=5min
+AccuracySec=1min
+Unit=douyin-fire.service
+
+[Install]
+WantedBy=timers.target

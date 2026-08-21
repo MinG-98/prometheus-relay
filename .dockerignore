@@ -1,0 +1,15 @@
+.git
+.github
+.venv
+**/__pycache__
+*.py[cod]
+.env
+.env.*
+chrome
+logs
+usersData.json
+tests
+docs
+Dockerfile*
+compose*.yml
+compose*.yaml

@@ -10,11 +10,21 @@ logger = setup_logger(level=logging.DEBUG)
 是否启用调试模式
 更详细的日志打印，浏览器操作可视化等
 """
-DEBUG = True
+DEBUG = False
 config = None
 userData = None
 
 SUPPORTED_LOG_LEVELS = {"Debug", "Info", "Warning", "Error"}
+
+
+def _env_bool(value, default=False):
+    """Read a boolean environment value with a safe fallback."""
+    if value is None:
+        return default
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+DEBUG = _env_bool(os.getenv("DEBUG"), default=False)
 
 
 class Environment(Enum):
