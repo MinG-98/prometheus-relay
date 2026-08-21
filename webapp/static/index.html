@@ -74,6 +74,7 @@
 <script>
   let state = null;
   let dirty = false;
+  let preserveForm = false;
   const base = location.pathname.endsWith('/') ? location.pathname : location.pathname + '/';
   const api = (path, options = {}) => fetch(base + path, { headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }, ...options });
   const $ = (id) => document.getElementById(id);
@@ -90,7 +91,7 @@
     }
   }
 
-  function render() {
+  function render(drafts = []) {
     const settings = state.config.settings;
     $('matchMode').value = settings.matchMode;
     $('logLevel').value = settings.logLevel;
@@ -117,13 +118,53 @@
         <textarea class="cookies" placeholder="${account.hasCookies ? `已保存 ${account.cookieCount} 条 Cookie；留空则保留原值` : '请粘贴 Cookie-Editor 导出的 JSON 数组'}"></textarea>
       </div>`).join('');
     $('accounts').querySelectorAll('.remove').forEach((button) => button.addEventListener('click', (event) => {
-      state.config.accounts.splice(Number(event.target.closest('.account').dataset.index), 1);
+      if (document.querySelector('[data-cookie-file-pending]')) {
+        say('Cookie 文件还在读取，请稍候再删除账号', true);
+        return;
+      }
+      const index = Number(event.target.closest('.account').dataset.index);
+      const drafts = captureDrafts();
+      drafts.splice(index, 1);
+      state.config.accounts.splice(index, 1);
       dirty = true;
-      render();
+      render(drafts);
     }));
     bindCookieFileInputs();
+    restoreDrafts(drafts);
     updateTargetLabels();
     updateStatus();
+  }
+
+  function captureDrafts() {
+    return [...document.querySelectorAll('.account')].map((element) => ({
+      username: element.querySelector('.username').value,
+      uniqueId: element.querySelector('.unique-id').value,
+      targets: element.querySelector('.targets').value,
+      cookies: element.querySelector('.cookies').value,
+      cookieJson: element.dataset.cookieJson || '',
+      cookieFileError: element.dataset.cookieFileError || '',
+      cookieFilePending: element.dataset.cookieFilePending || '',
+      cookieFileStatus: element.querySelector('.cookie-file-status')?.textContent || '',
+    }));
+  }
+
+  function restoreDrafts(drafts) {
+    drafts.forEach((draft, index) => {
+      const element = document.querySelectorAll('.account')[index];
+      if (!element) return;
+      element.querySelector('.username').value = draft.username;
+      element.querySelector('.unique-id').value = draft.uniqueId;
+      element.querySelector('.targets').value = draft.targets;
+      element.querySelector('.cookies').value = draft.cookies;
+      if (draft.cookieJson) element.dataset.cookieJson = draft.cookieJson;
+      if (draft.cookieFileError) element.dataset.cookieFileError = draft.cookieFileError;
+      if (draft.cookieFilePending) element.dataset.cookieFilePending = draft.cookieFilePending;
+      if (draft.cookieFileStatus) {
+        const status = element.querySelector('.cookie-file-status');
+        status.textContent = draft.cookieFileStatus;
+        status.className = draft.cookieFileError ? 'error cookie-file-status' : 'ok cookie-file-status';
+      }
+    });
   }
 
   function updateTargetLabels() {
@@ -201,15 +242,14 @@
         unique_id: uniqueId,
         targets: element.querySelector('.targets').value.split(/[\n,，]/).map((value) => value.trim()).filter(Boolean),
       };
-      const fileInput = element.querySelector('.cookie-file');
       const cookies = element.querySelector('.cookies').value.trim();
       if (element.dataset.cookieFilePending) {
         throw new Error(`账号 ${index + 1}：Cookie 文件还在读取，请稍候再保存`);
       }
-      if (fileInput.files?.length) {
-        if (element.dataset.cookieFileError || !element.dataset.cookieJson) {
-          throw new Error(`账号 ${index + 1}：Cookie 文件无效，请重新选择`);
-        }
+      if (element.dataset.cookieFileError) {
+        throw new Error(`账号 ${index + 1}：${element.dataset.cookieFileError}`);
+      }
+      if (element.dataset.cookieJson) {
         if (cookies) {
           throw new Error(`账号 ${index + 1}：请只选择 Cookie 文件或手动粘贴 JSON，不要同时填写`);
         }
@@ -249,7 +289,7 @@
     // Do not replace an account form while the user is editing it. The old
     // behaviour made a newly added account disappear on the next poll before
     // the user had a chance to save it.
-    if (!state || !dirty) {
+    if (!state || (!dirty && !preserveForm)) {
       state = nextState;
       render();
     } else {
@@ -263,9 +303,14 @@
   document.addEventListener('input', () => { dirty = true; });
   $('matchMode').addEventListener('change', () => { dirty = true; updateTargetLabels(); });
   $('addAccount').addEventListener('click', () => {
+    if (document.querySelector('[data-cookie-file-pending]')) {
+      say('Cookie 文件还在读取，请稍候再添加账号', true);
+      return;
+    }
+    const drafts = captureDrafts();
     state.config.accounts.push({ username: '', unique_id: '', targets: [], hasCookies: false, cookieCount: 0 });
     dirty = true;
-    render();
+    render(drafts);
     const account = document.querySelector('.account:last-child');
     account?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     account?.querySelector('.unique-id')?.focus();
@@ -278,8 +323,22 @@
       if (!response.ok) throw new Error(await responseError(response));
       state.config = (await response.json()).config;
       dirty = false;
-      render();
-      say('配置已保存');
+      preserveForm = true;
+      document.querySelectorAll('.account').forEach((element, index) => {
+        const account = state.config.accounts[index];
+        const status = element.querySelector('.cookie-file-status');
+        element.querySelector('.cookie-file').value = '';
+        element.querySelector('.cookies').value = '';
+        delete element.dataset.cookieJson;
+        delete element.dataset.cookieFileError;
+        delete element.dataset.cookieFilePending;
+        status.textContent = account?.hasCookies
+          ? `已保存 ${account.cookieCount} 条 Cookie；如需更换请重新选择文件`
+          : '尚未保存 Cookie';
+        status.className = account?.hasCookies ? 'muted cookie-file-status' : 'error cookie-file-status';
+      });
+      updateStatus();
+      say('配置已保存；Cookie 内容已清除，仅保留数量');
     } catch (error) { say(error.message, true); }
   });
   $('run').addEventListener('click', async () => {
