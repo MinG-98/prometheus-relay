@@ -6,6 +6,7 @@ import re
 import tempfile
 from copy import deepcopy
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 DATA_DIR = Path(os.getenv("DOUYIN_DATA_DIR", "/app/data"))
@@ -25,6 +26,11 @@ DEFAULT_CONFIG = {
         "friendListTimeout": 2000,
         "taskRetryTimes": 3,
         "logLevel": "Info",
+        "schedule": {
+            "enabled": False,
+            "time": "09:00",
+            "timezone": "Asia/Shanghai",
+        },
     },
     "accounts": [],
 }
@@ -127,6 +133,25 @@ def _normalise_cookies(value, account_name: str):
     return cookies
 
 
+def _normalise_schedule(value: object, defaults: dict) -> dict:
+    if not isinstance(value, dict):
+        raise ValueError("schedule 必须是 JSON 对象")
+    enabled = value.get("enabled", defaults["enabled"])
+    if not isinstance(enabled, bool):
+        raise ValueError("schedule.enabled 必须是布尔值")
+    schedule_time = str(value.get("time", defaults["time"])).strip()
+    if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", schedule_time):
+        raise ValueError("schedule.time 必须是 HH:MM 格式")
+    timezone = str(value.get("timezone", defaults["timezone"])).strip()
+    if not timezone or len(timezone) > 64:
+        raise ValueError("schedule.timezone 不合法")
+    try:
+        ZoneInfo(timezone)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise ValueError(f"定时运行时区不支持: {timezone}") from exc
+    return {"enabled": enabled, "time": schedule_time, "timezone": timezone}
+
+
 def normalise_config(payload: dict, current: dict | None = None) -> dict:
     if not isinstance(payload, dict):
         raise ValueError("配置必须是 JSON 对象")
@@ -150,6 +175,7 @@ def normalise_config(payload: dict, current: dict | None = None) -> dict:
     hitokoto_types = raw_settings.get("hitokotoTypes", defaults["hitokotoTypes"])
     if not isinstance(hitokoto_types, list) or not all(isinstance(item, str) for item in hitokoto_types):
         raise ValueError("hitokotoTypes 必须是字符串数组")
+    schedule = _normalise_schedule(raw_settings.get("schedule", defaults["schedule"]), defaults["schedule"])
 
     settings = {
         "proxyAddress": str(raw_settings.get("proxyAddress", defaults["proxyAddress"])).strip(),
@@ -180,6 +206,7 @@ def normalise_config(payload: dict, current: dict | None = None) -> dict:
             "taskRetryTimes",
         ),
         "logLevel": log_level,
+        "schedule": schedule,
     }
 
     raw_accounts = payload.get("accounts", [])
@@ -228,8 +255,10 @@ def normalise_config(payload: dict, current: dict | None = None) -> dict:
 
 
 def public_config(config: dict) -> dict:
+    settings = deepcopy(DEFAULT_CONFIG["settings"])
+    settings.update(deepcopy(config.get("settings", {})))
     return {
-        "settings": deepcopy(config.get("settings", DEFAULT_CONFIG["settings"])),
+        "settings": settings,
         "accounts": [
             {
                 "unique_id": account.get("unique_id", ""),

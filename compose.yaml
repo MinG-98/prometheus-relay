@@ -40,6 +40,24 @@ services:
     command: ["python", "-m", "webapp.task_runner"]
     restart: "no"
 
+  scheduler:
+    image: douyin-fire:local
+    env_file:
+      - ${DOUYIN_WEB_ENV_FILE:-.env}
+    environment:
+      PYTHONUNBUFFERED: "1"
+      DOUYIN_DATA_DIR: /app/data
+    init: true
+    ipc: host
+    user: appuser
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - douyin_data:/app/data
+      - douyin_logs:/app/logs
+    command: ["python", "-m", "webapp.scheduler"]
+    restart: unless-stopped
+
 volumes:
   douyin_data:
   douyin_logs:

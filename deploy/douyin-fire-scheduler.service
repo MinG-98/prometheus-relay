@@ -1,0 +1,19 @@
+[Unit]
+Description=Douyin Fire schedule worker
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/douyin-fire
+Environment=COMPOSE_PROJECT_NAME=douyin-fire
+Environment=DOUYIN_WEB_ENV_FILE=/etc/douyin-fire/web.env
+ExecStartPre=/usr/bin/test -s /etc/douyin-fire/web.env
+ExecStart=/usr/bin/docker compose up -d scheduler
+ExecStop=/usr/bin/docker compose stop scheduler
+TimeoutStartSec=5min
+TimeoutStopSec=60s
+
+[Install]
+WantedBy=multi-user.target

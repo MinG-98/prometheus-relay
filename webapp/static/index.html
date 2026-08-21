@@ -19,6 +19,8 @@
     .account { border: 1px solid #dce2e8; border-radius: 10px; padding: 14px; margin: 12px 0; }
     .account-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
     .cookie-upload { display: grid; gap: 6px; }
+    .inline-checkbox { display: flex; align-items: center; gap: 8px; }
+    .inline-checkbox input { width: auto; }
     .muted { color: #65727e; font-size: .9rem; }
     .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
     button { cursor: pointer; border: 0; border-radius: 8px; padding: 10px 14px; background: #1677ff; color: white; font-weight: 600; }
@@ -53,6 +55,12 @@
       <div><label for="taskRetryTimes">重试次数</label><input id="taskRetryTimes" type="number" min="1" max="10"></div>
       <div><label for="hitokotoTypes">一言类型（逗号分隔）</label><input id="hitokotoTypes" placeholder="文学,影视,诗词,哲学"></div>
     </div>
+    <div class="grid">
+      <div><label class="inline-checkbox"><input id="scheduleEnabled" type="checkbox">启用每日定时运行</label></div>
+      <div><label for="scheduleTime">每日运行时间</label><input id="scheduleTime" type="time"></div>
+      <div><label for="scheduleTimezone">定时运行时区</label><input id="scheduleTimezone" type="text" placeholder="Asia/Shanghai"></div>
+    </div>
+    <p class="muted">保存后由 VPS 调度器按该时区每天运行一次；关闭开关即可停用定时任务。默认北京时间 09:00，定时任务不会影响“立即运行”。</p>
   </div>
 
   <div class="card">
@@ -91,7 +99,7 @@
     }
   }
 
-  function render(drafts = []) {
+  function render(drafts = {}) {
     const settings = state.config.settings;
     $('matchMode').value = settings.matchMode;
     $('logLevel').value = settings.logLevel;
@@ -100,6 +108,10 @@
     $('friendListTimeout').value = settings.friendListTimeout;
     $('taskRetryTimes').value = settings.taskRetryTimes;
     $('hitokotoTypes').value = (settings.hitokotoTypes || []).join(',');
+    const schedule = { enabled: false, time: '09:00', timezone: 'Asia/Shanghai', ...(settings.schedule || {}) };
+    $('scheduleEnabled').checked = Boolean(schedule.enabled);
+    $('scheduleTime').value = schedule.time;
+    $('scheduleTimezone').value = schedule.timezone;
     $('accounts').innerHTML = state.config.accounts.map((account, index) => `
       <div class="account" data-index="${index}">
         <div class="account-head"><strong>账号 ${index + 1}</strong><button type="button" class="danger remove">删除</button></div>
@@ -123,16 +135,35 @@
         return;
       }
       const index = Number(event.target.closest('.account').dataset.index);
-      const drafts = captureDrafts();
-      drafts.splice(index, 1);
+      const drafts = captureForm();
+      drafts.accounts.splice(index, 1);
       state.config.accounts.splice(index, 1);
       dirty = true;
       render(drafts);
     }));
     bindCookieFileInputs();
-    restoreDrafts(drafts);
+    restoreFormSettings(drafts.settings);
+    restoreDrafts(drafts.accounts || []);
     updateTargetLabels();
     updateStatus();
+  }
+
+  function captureForm() {
+    return {
+      settings: {
+        matchMode: $('matchMode').value,
+        logLevel: $('logLevel').value,
+        messageTemplate: $('messageTemplate').value,
+        browserTimeout: $('browserTimeout').value,
+        friendListTimeout: $('friendListTimeout').value,
+        taskRetryTimes: $('taskRetryTimes').value,
+        hitokotoTypes: $('hitokotoTypes').value,
+        scheduleEnabled: $('scheduleEnabled').checked,
+        scheduleTime: $('scheduleTime').value,
+        scheduleTimezone: $('scheduleTimezone').value,
+      },
+      accounts: captureDrafts(),
+    };
   }
 
   function captureDrafts() {
@@ -146,6 +177,20 @@
       cookieFilePending: element.dataset.cookieFilePending || '',
       cookieFileStatus: element.querySelector('.cookie-file-status')?.textContent || '',
     }));
+  }
+
+  function restoreFormSettings(draft) {
+    if (!draft) return;
+    $('matchMode').value = draft.matchMode;
+    $('logLevel').value = draft.logLevel;
+    $('messageTemplate').value = draft.messageTemplate;
+    $('browserTimeout').value = draft.browserTimeout;
+    $('friendListTimeout').value = draft.friendListTimeout;
+    $('taskRetryTimes').value = draft.taskRetryTimes;
+    $('hitokotoTypes').value = draft.hitokotoTypes;
+    $('scheduleEnabled').checked = draft.scheduleEnabled;
+    $('scheduleTime').value = draft.scheduleTime;
+    $('scheduleTimezone').value = draft.scheduleTimezone;
   }
 
   function restoreDrafts(drafts) {
@@ -279,6 +324,11 @@
       friendListTimeout: Number($('friendListTimeout').value),
       taskRetryTimes: Number($('taskRetryTimes').value),
       hitokotoTypes: $('hitokotoTypes').value.split(/[,，]/).map((value) => value.trim()).filter(Boolean),
+      schedule: {
+        enabled: $('scheduleEnabled').checked,
+        time: $('scheduleTime').value,
+        timezone: $('scheduleTimezone').value.trim(),
+      },
     }, accounts };
   }
 
@@ -302,12 +352,13 @@
 
   document.addEventListener('input', () => { dirty = true; });
   $('matchMode').addEventListener('change', () => { dirty = true; updateTargetLabels(); });
+  ['scheduleEnabled', 'scheduleTime', 'scheduleTimezone'].forEach((id) => $(id).addEventListener('change', () => { dirty = true; }));
   $('addAccount').addEventListener('click', () => {
     if (document.querySelector('[data-cookie-file-pending]')) {
       say('Cookie 文件还在读取，请稍候再添加账号', true);
       return;
     }
-    const drafts = captureDrafts();
+    const drafts = captureForm();
     state.config.accounts.push({ username: '', unique_id: '', targets: [], hasCookies: false, cookieCount: 0 });
     dirty = true;
     render(drafts);
