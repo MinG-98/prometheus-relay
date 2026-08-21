@@ -18,6 +18,7 @@
     .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
     .account { border: 1px solid #dce2e8; border-radius: 10px; padding: 14px; margin: 12px 0; }
     .account-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .cookie-upload { display: grid; gap: 6px; }
     .muted { color: #65727e; font-size: .9rem; }
     .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
     button { cursor: pointer; border: 0; border-radius: 8px; padding: 10px 14px; background: #1677ff; color: white; font-weight: 600; }
@@ -57,7 +58,7 @@
   <div class="card">
     <h2>账号</h2>
     <p class="muted">每个账号都要填写自己的抖音号、用户名和 Cookie；新增空白账号后不能直接保存。抖音号只能包含字母、数字、下划线或短横线。</p>
-    <p class="muted">已保存的 Cookie 只显示数量，不会回显到网页。更换 Cookie 时重新粘贴 Cookie-Editor 导出的 JSON。</p>
+    <p class="muted">已保存的 Cookie 只显示数量，不会回显到网页。更换 Cookie 时重新选择 Cookie-Editor 导出的 JSON 文件或重新粘贴 JSON。</p>
     <div id="accounts"></div>
     <button id="addAccount" class="secondary">添加账号</button>
   </div>
@@ -107,7 +108,12 @@
         </div>
         <label class="target-label">目标好友抖音号（逗号或换行分隔）</label>
         <textarea class="targets" placeholder="每行填写一个好友抖音号">${escapeHtml((account.targets || []).join('\n'))}</textarea>
-        <label>Cookie JSON</label>
+        <label>Cookie 文件（推荐）</label>
+        <div class="cookie-upload">
+          <input class="cookie-file" type="file" accept=".json,application/json,text/json">
+          <span class="muted cookie-file-status">${account.hasCookies ? `未选择文件；留空保留已保存的 ${account.cookieCount} 条 Cookie` : '请选择 Cookie-Editor 导出的 JSON 文件（最大 2 MB）'}</span>
+        </div>
+        <label>Cookie JSON（也可手动粘贴）</label>
         <textarea class="cookies" placeholder="${account.hasCookies ? `已保存 ${account.cookieCount} 条 Cookie；留空则保留原值` : '请粘贴 Cookie-Editor 导出的 JSON 数组'}"></textarea>
       </div>`).join('');
     $('accounts').querySelectorAll('.remove').forEach((button) => button.addEventListener('click', (event) => {
@@ -115,6 +121,7 @@
       dirty = true;
       render();
     }));
+    bindCookieFileInputs();
     updateTargetLabels();
     updateStatus();
   }
@@ -136,6 +143,49 @@
     $('status').className = running ? 'error' : 'muted';
   }
 
+  function bindCookieFileInputs() {
+    document.querySelectorAll('.cookie-file').forEach((input) => input.addEventListener('change', async () => {
+      const account = input.closest('.account');
+      const status = account.querySelector('.cookie-file-status');
+      const file = input.files?.[0];
+      delete account.dataset.cookieJson;
+      delete account.dataset.cookieFileError;
+      if (!file) {
+        status.textContent = '尚未选择 Cookie 文件';
+        return;
+      }
+      dirty = true;
+      if (file.size > 2 * 1024 * 1024) {
+        account.dataset.cookieFileError = '文件不能超过 2 MB';
+        status.textContent = '文件过大，不能超过 2 MB';
+        status.className = 'error cookie-file-status';
+        say('Cookie 文件过大，不能超过 2 MB', true);
+        return;
+      }
+      account.dataset.cookieFilePending = '1';
+      status.textContent = `正在读取 ${file.name}…`;
+      status.className = 'muted cookie-file-status';
+      try {
+        const text = await file.text();
+        const cookies = JSON.parse(text);
+        if (!Array.isArray(cookies) || cookies.length === 0 || cookies.some((cookie) => !cookie || typeof cookie !== 'object' || Array.isArray(cookie))) {
+          throw new Error('文件必须是非空 JSON 数组，且每项都是对象');
+        }
+        account.dataset.cookieJson = text;
+        status.textContent = `已读取 ${file.name}（${cookies.length} 条 Cookie）`;
+        status.className = 'ok cookie-file-status';
+        say(`账号 ${Number(account.dataset.index) + 1} 的 Cookie 文件已读取，请点击保存配置`);
+      } catch (error) {
+        account.dataset.cookieFileError = error.message || 'Cookie 文件无效';
+        status.textContent = account.dataset.cookieFileError;
+        status.className = 'error cookie-file-status';
+        say(`账号 ${Number(account.dataset.index) + 1}：${account.dataset.cookieFileError}`, true);
+      } finally {
+        delete account.dataset.cookieFilePending;
+      }
+    }));
+  }
+
   function collect() {
     const accounts = [...document.querySelectorAll('.account')].map((element, index) => {
       const username = element.querySelector('.username').value.trim();
@@ -151,8 +201,20 @@
         unique_id: uniqueId,
         targets: element.querySelector('.targets').value.split(/[\n,，]/).map((value) => value.trim()).filter(Boolean),
       };
+      const fileInput = element.querySelector('.cookie-file');
       const cookies = element.querySelector('.cookies').value.trim();
-      if (cookies) {
+      if (element.dataset.cookieFilePending) {
+        throw new Error(`账号 ${index + 1}：Cookie 文件还在读取，请稍候再保存`);
+      }
+      if (fileInput.files?.length) {
+        if (element.dataset.cookieFileError || !element.dataset.cookieJson) {
+          throw new Error(`账号 ${index + 1}：Cookie 文件无效，请重新选择`);
+        }
+        if (cookies) {
+          throw new Error(`账号 ${index + 1}：请只选择 Cookie 文件或手动粘贴 JSON，不要同时填写`);
+        }
+        account.cookies = JSON.parse(element.dataset.cookieJson);
+      } else if (cookies) {
         try {
           account.cookies = JSON.parse(cookies);
         } catch (_) {

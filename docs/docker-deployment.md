@@ -21,7 +21,7 @@ systemctl enable --now douyin-fire.timer
 
 ## 网页配置
 
-打开网页后填写账号、目标好友和 Cookie-Editor 导出的 JSON。已保存的 Cookie 只显示数量，不会回显。网页的“立即运行”会与每日定时任务共用锁，避免并发发送。
+打开网页后填写账号和目标好友；Cookie 可直接选择 Cookie-Editor 导出的 JSON 文件（最大 2 MB），也可以手动粘贴 JSON。已保存的 Cookie 只显示数量，不会回显。网页的“立即运行”会与每日定时任务共用锁，避免并发发送。
 
 ## 手动执行和查看日志
 
