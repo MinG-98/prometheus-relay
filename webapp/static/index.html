@@ -56,6 +56,7 @@
 
   <div class="card">
     <h2>账号</h2>
+    <p class="muted">每个账号都要填写自己的抖音号、用户名和 Cookie；新增空白账号后不能直接保存。抖音号只能包含字母、数字、下划线或短横线。</p>
     <p class="muted">已保存的 Cookie 只显示数量，不会回显到网页。更换 Cookie 时重新粘贴 Cookie-Editor 导出的 JSON。</p>
     <div id="accounts"></div>
     <button id="addAccount" class="secondary">添加账号</button>
@@ -78,6 +79,16 @@
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
   const say = (text, error = false) => { $('message').textContent = text; $('message').className = error ? 'error' : 'ok'; };
 
+  async function responseError(response) {
+    try {
+      const payload = await response.json();
+      if (typeof payload === 'string') return payload;
+      return payload.detail || payload.message || `请求失败（HTTP ${response.status}）`;
+    } catch (_) {
+      return `请求失败（HTTP ${response.status}）`;
+    }
+  }
+
   function render() {
     const settings = state.config.settings;
     $('matchMode').value = settings.matchMode;
@@ -92,7 +103,7 @@
         <div class="account-head"><strong>账号 ${index + 1}</strong><button type="button" class="danger remove">删除</button></div>
         <div class="grid">
           <div><label>用户名</label><input class="username" value="${escapeHtml(account.username)}"></div>
-          <div><label>抖音号</label><input class="unique-id" value="${escapeHtml(account.unique_id)}"></div>
+          <div><label>抖音号（必填）</label><input class="unique-id" value="${escapeHtml(account.unique_id)}" placeholder="例如：abc123"></div>
         </div>
         <label class="target-label">目标好友抖音号（逗号或换行分隔）</label>
         <textarea class="targets" placeholder="每行填写一个好友抖音号">${escapeHtml((account.targets || []).join('\n'))}</textarea>
@@ -126,14 +137,36 @@
   }
 
   function collect() {
-    const accounts = [...document.querySelectorAll('.account')].map((element) => {
+    const accounts = [...document.querySelectorAll('.account')].map((element, index) => {
+      const username = element.querySelector('.username').value.trim();
+      const uniqueId = element.querySelector('.unique-id').value.trim();
+      if (!/^[A-Za-z0-9_-]{1,64}$/.test(uniqueId)) {
+        throw new Error(`账号 ${index + 1}：请输入抖音号，只能包含字母、数字、下划线或短横线`);
+      }
+      if (!username) {
+        throw new Error(`账号 ${index + 1}：请填写用户名`);
+      }
       const account = {
-        username: element.querySelector('.username').value.trim(),
-        unique_id: element.querySelector('.unique-id').value.trim(),
+        username,
+        unique_id: uniqueId,
         targets: element.querySelector('.targets').value.split(/[\n,，]/).map((value) => value.trim()).filter(Boolean),
       };
       const cookies = element.querySelector('.cookies').value.trim();
-      if (cookies) account.cookies = JSON.parse(cookies);
+      if (cookies) {
+        try {
+          account.cookies = JSON.parse(cookies);
+        } catch (_) {
+          throw new Error(`账号 ${index + 1}：Cookie 必须是有效的 JSON`);
+        }
+        if (!Array.isArray(account.cookies) || account.cookies.length === 0) {
+          throw new Error(`账号 ${index + 1}：Cookie 必须是非空 JSON 数组`);
+        }
+      } else {
+        const existing = state?.config?.accounts?.[index];
+        if (!existing || existing.unique_id !== uniqueId || !existing.hasCookies) {
+          throw new Error(`账号 ${index + 1}：请粘贴 Cookie-Editor 导出的 JSON 数组`);
+        }
+      }
       return account;
     });
     return { settings: {
@@ -149,7 +182,7 @@
 
   async function refresh() {
     const response = await api('api/state');
-    if (!response.ok) throw new Error(await response.text());
+    if (!response.ok) throw new Error(await responseError(response));
     const nextState = await response.json();
     // Do not replace an account form while the user is editing it. The old
     // behaviour made a newly added account disappear on the next poll before
@@ -171,12 +204,16 @@
     state.config.accounts.push({ username: '', unique_id: '', targets: [], hasCookies: false, cookieCount: 0 });
     dirty = true;
     render();
+    const account = document.querySelector('.account:last-child');
+    account?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    account?.querySelector('.unique-id')?.focus();
+    say(`账号 ${state.config.accounts.length} 已添加，请填写抖音号、用户名和 Cookie`);
   });
   $('refresh').addEventListener('click', () => refresh().catch((error) => say(error.message, true)));
   $('save').addEventListener('click', async () => {
     try {
       const response = await api('api/config', { method: 'POST', body: JSON.stringify(collect()) });
-      if (!response.ok) throw new Error(await response.text());
+      if (!response.ok) throw new Error(await responseError(response));
       state.config = (await response.json()).config;
       dirty = false;
       render();
@@ -187,7 +224,7 @@
     try {
       if (dirty) throw new Error('请先保存配置，再立即运行');
       const response = await api('api/run', { method: 'POST' });
-      if (!response.ok) throw new Error(await response.text());
+      if (!response.ok) throw new Error(await responseError(response));
       say('任务已启动'); await refresh();
     } catch (error) { say(error.message, true); }
   });
