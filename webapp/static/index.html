@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Douyin Fire</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { margin: 0; background: #f4f6f8; color: #17202a; }
+    main { max-width: 980px; margin: 0 auto; padding: 24px 16px 48px; }
+    .card { background: white; border-radius: 14px; padding: 20px; margin: 14px 0; box-shadow: 0 4px 20px #17202a12; }
+    h1, h2 { margin-top: 0; }
+    h1 { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    h2 { font-size: 1.1rem; }
+    label { display: block; font-weight: 600; margin: 12px 0 6px; }
+    input, textarea, select { box-sizing: border-box; width: 100%; border: 1px solid #ccd3da; border-radius: 8px; padding: 9px 10px; background: #fff; color: inherit; }
+    textarea { min-height: 82px; resize: vertical; font-family: inherit; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .account { border: 1px solid #dce2e8; border-radius: 10px; padding: 14px; margin: 12px 0; }
+    .account-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .muted { color: #65727e; font-size: .9rem; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+    button { cursor: pointer; border: 0; border-radius: 8px; padding: 10px 14px; background: #1677ff; color: white; font-weight: 600; }
+    button.secondary { background: #65727e; }
+    button.danger { background: #d64545; }
+    pre { white-space: pre-wrap; word-break: break-word; background: #111827; color: #d1fae5; border-radius: 8px; padding: 14px; min-height: 120px; max-height: 420px; overflow: auto; }
+    #message { min-height: 1.5em; margin-top: 10px; }
+    .ok { color: #087f5b; } .error { color: #c92a2a; }
+    @media (max-width: 680px) { .grid { grid-template-columns: 1fr; } main { padding: 14px 10px 32px; } }
+    @media (prefers-color-scheme: dark) {
+      body { background: #111827; color: #e5e7eb; }
+      .card, input, textarea, select { background: #1f2937; color: #e5e7eb; border-color: #4b5563; }
+      .account { border-color: #4b5563; }
+      .muted { color: #a9b4c0; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1><span>Douyin Fire</span><span id="status" class="muted">加载中…</span></h1>
+  <div class="card">
+    <h2>任务设置</h2>
+    <div class="grid">
+      <div><label for="matchMode">匹配方式</label><select id="matchMode"><option value="nickname">昵称</option><option value="short_id">抖音号</option></select></div>
+      <div><label for="logLevel">日志级别</label><select id="logLevel"><option>Info</option><option>Debug</option><option>Warning</option><option>Error</option></select></div>
+    </div>
+    <label for="messageTemplate">消息模板</label>
+    <textarea id="messageTemplate" placeholder="续火花"></textarea>
+    <div class="grid">
+      <div><label for="browserTimeout">浏览器超时（毫秒）</label><input id="browserTimeout" type="number" min="1000"></div>
+      <div><label for="friendListTimeout">好友列表等待（毫秒）</label><input id="friendListTimeout" type="number" min="0"></div>
+      <div><label for="taskRetryTimes">重试次数</label><input id="taskRetryTimes" type="number" min="1" max="10"></div>
+      <div><label for="hitokotoTypes">一言类型（逗号分隔）</label><input id="hitokotoTypes" placeholder="文学,影视,诗词,哲学"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>账号</h2>
+    <p class="muted">已保存的 Cookie 只显示数量，不会回显到网页。更换 Cookie 时重新粘贴 Cookie-Editor 导出的 JSON。</p>
+    <div id="accounts"></div>
+    <button id="addAccount" class="secondary">添加账号</button>
+  </div>
+
+  <div class="card">
+    <h2>运行</h2>
+    <div class="actions"><button id="save">保存配置</button><button id="run">立即运行</button><button id="refresh" class="secondary">刷新状态</button></div>
+    <div id="message" class="muted"></div>
+  </div>
+
+  <div class="card"><h2>最近日志</h2><pre id="logs">暂无日志</pre></div>
+</main>
+<script>
+  let state = null;
+  const base = location.pathname.endsWith('/') ? location.pathname : location.pathname + '/';
+  const api = (path, options = {}) => fetch(base + path, { headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }, ...options });
+  const $ = (id) => document.getElementById(id);
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
+  const say = (text, error = false) => { $('message').textContent = text; $('message').className = error ? 'error' : 'ok'; };
+
+  function render() {
+    const settings = state.config.settings;
+    $('matchMode').value = settings.matchMode;
+    $('logLevel').value = settings.logLevel;
+    $('messageTemplate').value = settings.messageTemplate;
+    $('browserTimeout').value = settings.browserTimeout;
+    $('friendListTimeout').value = settings.friendListTimeout;
+    $('taskRetryTimes').value = settings.taskRetryTimes;
+    $('hitokotoTypes').value = (settings.hitokotoTypes || []).join(',');
+    $('accounts').innerHTML = state.config.accounts.map((account, index) => `
+      <div class="account" data-index="${index}">
+        <div class="account-head"><strong>账号 ${index + 1}</strong><button type="button" class="danger remove">删除</button></div>
+        <div class="grid">
+          <div><label>用户名</label><input class="username" value="${escapeHtml(account.username)}"></div>
+          <div><label>抖音号</label><input class="unique-id" value="${escapeHtml(account.unique_id)}"></div>
+        </div>
+        <label>目标好友（逗号或换行分隔）</label>
+        <textarea class="targets">${escapeHtml((account.targets || []).join('\n'))}</textarea>
+        <label>Cookie JSON</label>
+        <textarea class="cookies" placeholder="${account.hasCookies ? `已保存 ${account.cookieCount} 条 Cookie；留空则保留原值` : '请粘贴 Cookie-Editor 导出的 JSON 数组'}"></textarea>
+      </div>`).join('');
+    $('accounts').querySelectorAll('.remove').forEach((button) => button.addEventListener('click', (event) => {
+      state.config.accounts.splice(Number(event.target.closest('.account').dataset.index), 1); render();
+    }));
+    const running = state.status && state.status.running;
+    $('status').textContent = running ? '运行中' : `空闲${state.status && state.status.exitCode !== null && state.status.exitCode !== undefined ? ` · 上次退出 ${state.status.exitCode}` : ''}`;
+    $('status').className = running ? 'error' : 'muted';
+  }
+
+  function collect() {
+    const accounts = [...document.querySelectorAll('.account')].map((element) => {
+      const account = {
+        username: element.querySelector('.username').value.trim(),
+        unique_id: element.querySelector('.unique-id').value.trim(),
+        targets: element.querySelector('.targets').value.split(/[\n,，]/).map((value) => value.trim()).filter(Boolean),
+      };
+      const cookies = element.querySelector('.cookies').value.trim();
+      if (cookies) account.cookies = JSON.parse(cookies);
+      return account;
+    });
+    return { settings: {
+      matchMode: $('matchMode').value,
+      logLevel: $('logLevel').value,
+      messageTemplate: $('messageTemplate').value,
+      browserTimeout: Number($('browserTimeout').value),
+      friendListTimeout: Number($('friendListTimeout').value),
+      taskRetryTimes: Number($('taskRetryTimes').value),
+      hitokotoTypes: $('hitokotoTypes').value.split(/[,，]/).map((value) => value.trim()).filter(Boolean),
+    }, accounts };
+  }
+
+  async function refresh() {
+    const response = await api('api/state');
+    if (!response.ok) throw new Error(await response.text());
+    state = await response.json(); render();
+    const logs = await api('api/log');
+    if (logs.ok) $('logs').textContent = (await logs.json()).log || '暂无日志';
+  }
+
+  $('addAccount').addEventListener('click', () => { state.config.accounts.push({ username: '', unique_id: '', targets: [], hasCookies: false, cookieCount: 0 }); render(); });
+  $('refresh').addEventListener('click', () => refresh().catch((error) => say(error.message, true)));
+  $('save').addEventListener('click', async () => {
+    try {
+      const response = await api('api/config', { method: 'POST', body: JSON.stringify(collect()) });
+      if (!response.ok) throw new Error(await response.text());
+      state.config = (await response.json()).config; render(); say('配置已保存');
+    } catch (error) { say(error.message, true); }
+  });
+  $('run').addEventListener('click', async () => {
+    try {
+      const response = await api('api/run', { method: 'POST' });
+      if (!response.ok) throw new Error(await response.text());
+      say('任务已启动'); await refresh();
+    } catch (error) { say(error.message, true); }
+  });
+  refresh().catch((error) => say(error.message, true));
+  setInterval(() => refresh().catch(() => {}), 5000);
+</script>
+</body>
+</html>

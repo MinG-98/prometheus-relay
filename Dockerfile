@@ -17,7 +17,7 @@ COPY . .
 # Do not run browser automation as root. The Playwright image already
 # contains Chromium and its system dependencies.
 RUN useradd --create-home --shell /usr/sbin/nologin appuser \
-    && mkdir -p /app/logs \
+    && mkdir -p /app/data /app/logs \
     && chown -R appuser:appuser /app
 
 USER appuser

@@ -1,17 +1,19 @@
 [Unit]
-Description=Douyin Fire Docker task
+Description=Douyin Fire web application
 Requires=docker.service
 After=docker.service
 
 [Service]
 Type=oneshot
+RemainAfterExit=yes
 WorkingDirectory=/opt/douyin-fire
 Environment=COMPOSE_PROJECT_NAME=douyin-fire
 Environment=DOUYIN_WEB_ENV_FILE=/etc/douyin-fire/web.env
 ExecStartPre=/usr/bin/test -s /etc/douyin-fire/web.env
-ExecStart=/usr/bin/flock -n /run/lock/douyin-fire.lock /usr/bin/docker compose run --rm --no-deps worker
-TimeoutStartSec=45min
+ExecStart=/usr/bin/docker compose up -d web
+ExecStop=/usr/bin/docker compose stop web
+TimeoutStartSec=5min
 TimeoutStopSec=60s
-KillMode=control-group
-StandardOutput=journal
-StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

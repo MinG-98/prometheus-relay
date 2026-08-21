@@ -1,34 +1,40 @@
-# Docker 部署
+# Docker 网页部署
 
-本项目在 VPS 上以一次性容器运行：容器完成当天任务后退出，由 systemd timer 每天启动一次。
+项目在 VPS 上运行一个受 Basic Auth 保护的网页管理面板，后台仍使用 Playwright 执行任务。网页服务和每日任务共用 Docker 数据卷，Cookie 不会写进镜像。
 
 ## 首次部署
 
 ```bash
 mkdir -p /etc/douyin-fire
-install -m 600 .env.example /etc/douyin-fire/douyin-fire.env
-vim /etc/douyin-fire/douyin-fire.env
+install -m 600 .env.web.example /etc/douyin-fire/web.env
+vim /etc/douyin-fire/web.env
 docker compose build --pull
+install -m 644 deploy/douyin-fire-web.service /etc/systemd/system/douyin-fire-web.service
 install -m 644 deploy/douyin-fire.service /etc/systemd/system/douyin-fire.service
 install -m 644 deploy/douyin-fire.timer /etc/systemd/system/douyin-fire.timer
 systemctl daemon-reload
+systemctl enable --now douyin-fire-web.service
 systemctl enable --now douyin-fire.timer
 ```
 
-## 手动试运行
+网页面板默认监听 `127.0.0.1:18081`，应通过 Caddy 或其他反向代理访问，不要直接暴露到公网。
+
+## 网页配置
+
+打开网页后填写账号、目标好友和 Cookie-Editor 导出的 JSON。已保存的 Cookie 只显示数量，不会回显。网页的“立即运行”会与每日定时任务共用锁，避免并发发送。
+
+## 手动执行和查看日志
 
 ```bash
 systemctl start douyin-fire.service
 journalctl -u douyin-fire.service -n 200 --no-pager
 ```
 
-## 维护
-
-更新代码后重新构建镜像：
+更新代码后重新构建并重启网页服务：
 
 ```bash
 docker compose build --pull
-systemctl start douyin-fire.service
+systemctl restart douyin-fire-web.service
 ```
 
-配置文件只放在 `/etc/douyin-fire/douyin-fire.env`，不要复制进镜像或提交到 Git。定时任务默认每天北京时间 09:00 执行，并随机延迟最多 5 分钟以避免固定时间触发。
+每日任务默认北京时间 09:00 执行，并随机延迟最多 5 分钟。Cookie 属于登录凭证，不要提交到 Git 或发送到聊天。
