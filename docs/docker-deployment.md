@@ -54,7 +54,7 @@ sudo systemctl restart prometheus-relay-scheduler.service
 
 ```bash
 sudo docker run --rm \
-  -v prometheus-relay_prometheus_relay_data:/data:ro \
+  -v prometheus-relay-data:/data:ro \
   -v "$PWD":/backup \
   alpine tar -czf /backup/prometheus-relay-data.tar.gz -C /data .
 ```

@@ -60,4 +60,6 @@ services:
 
 volumes:
   prometheus_relay_data:
+    name: ${PROMETHEUS_RELAY_DATA_VOLUME:-prometheus-relay-data}
   prometheus_relay_logs:
+    name: ${PROMETHEUS_RELAY_LOGS_VOLUME:-prometheus-relay-logs}
