@@ -73,6 +73,8 @@ async def add_security_headers(request: Request, call_next):
     )
     if request.url.path == "/" or request.url.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
+    elif request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache"
     return response
 
 

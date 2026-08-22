@@ -74,3 +74,16 @@ relay.example.com {
 ```
 
 反向代理完成后访问 `https://relay.example.com`。`/healthz` 可用于本机健康检查，但外部访问仍应经过统一的访问控制策略。
+
+若必须部署在子路径，务必将不带尾部斜杠的入口重定向到带斜杠的入口，否则浏览器会把相对静态资源解析到站点根目录：
+
+```caddyfile
+example.com {
+    @relay_without_slash path /relay
+    redir @relay_without_slash /relay/ 308
+
+    handle_path /relay/* {
+        reverse_proxy 127.0.0.1:18081
+    }
+}
+```
