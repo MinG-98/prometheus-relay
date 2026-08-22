@@ -108,6 +108,47 @@ class RuntimeStateTests(unittest.TestCase):
 
         self.assertEqual(config_store.read_scheduler_status(), expected)
 
+    def test_scanned_account_refresh_preserves_targets(self):
+        config_store.save_config(
+            {
+                "settings": config_store.DEFAULT_CONFIG["settings"],
+                "accounts": [
+                    {
+                        "unique_id": "owner123",
+                        "username": "旧昵称",
+                        "targets": ["friend456"],
+                        "cookies": [{"name": "sessionid", "value": "old"}],
+                    }
+                ],
+            }
+        )
+
+        public_account, created = config_store.upsert_scanned_account(
+            "owner123",
+            "新昵称",
+            [{"name": "sessionid", "value": "new", "domain": ".douyin.com"}],
+        )
+        stored = config_store.load_config()["accounts"][0]
+
+        self.assertFalse(created)
+        self.assertEqual(stored["targets"], ["friend456"])
+        self.assertEqual(stored["username"], "新昵称")
+        self.assertEqual(stored["cookies"][0]["value"], "new")
+        self.assertNotIn("cookies", public_account)
+
+    def test_scanned_account_can_be_created_without_manual_cookie_form(self):
+        public_account, created = config_store.upsert_scanned_account(
+            "owner789",
+            "扫码账号",
+            [{"name": "sessionid", "value": "fresh", "domain": ".douyin.com"}],
+        )
+
+        self.assertTrue(created)
+        self.assertEqual(public_account["unique_id"], "owner789")
+        self.assertEqual(public_account["targets"], [])
+        self.assertTrue(public_account["hasCookies"])
+        self.assertNotIn("cookies", public_account)
+
 
 if __name__ == "__main__":
     unittest.main()

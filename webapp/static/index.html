@@ -183,12 +183,18 @@
             <div>
               <p class="eyebrow">发送账号</p>
               <h2 id="accountsTitle">账号与目标好友</h2>
-              <p id="accountsDescription" class="section-description">每个账号使用各自的 Cookie 登录并向目标好友发送消息。</p>
+              <p id="accountsDescription" class="section-description">优先扫码登录；每个账号会使用独立登录状态向目标好友发送消息。</p>
             </div>
-            <button id="addAccount" class="button secondary" type="button">
-              <span aria-hidden="true">＋</span>
-              添加账号
-            </button>
+            <div class="account-heading-actions">
+              <button id="scanAccount" class="button primary" type="button">
+                <span aria-hidden="true">▦</span>
+                扫码添加
+              </button>
+              <button id="addAccount" class="button secondary" type="button">
+                <span aria-hidden="true">＋</span>
+                手动添加
+              </button>
+            </div>
           </div>
           <div id="accounts" class="account-list" aria-describedby="accountsDescription">
             <div class="loading-placeholder">正在读取账号…</div>
@@ -252,6 +258,71 @@
     <div class="dialog-actions">
       <button id="confirmCancel" class="button ghost" type="button">取消</button>
       <button id="confirmAction" class="button primary" type="button">确认</button>
+    </div>
+  </dialog>
+
+  <dialog id="qrDialog" class="qr-dialog" aria-labelledby="qrTitle" aria-describedby="qrMessage">
+    <div class="qr-dialog-header">
+      <div>
+        <p class="eyebrow">免 Cookie 配置</p>
+        <h2 id="qrTitle">扫码添加抖音账号</h2>
+      </div>
+      <button id="qrClose" class="icon-button qr-close" type="button" aria-label="关闭扫码登录">×</button>
+    </div>
+
+    <div class="qr-dialog-grid">
+      <div>
+        <div id="qrFrame" class="qr-frame loading" aria-live="polite">
+          <img id="qrImage" alt="抖音登录二维码" hidden>
+          <div id="qrPlaceholder" class="qr-placeholder">
+            <span class="qr-spinner" aria-hidden="true"></span>
+            <span>正在生成二维码…</span>
+          </div>
+        </div>
+        <div class="qr-status-row" role="status" aria-live="polite">
+          <span id="qrStatusDot" class="qr-status-dot" aria-hidden="true"></span>
+          <div>
+            <strong id="qrStatusTitle">正在连接抖音</strong>
+            <p id="qrMessage">二维码只会在本次登录期间临时保存在服务器内存中。</p>
+          </div>
+        </div>
+        <p id="qrCountdown" class="qr-countdown">有效时间约 5 分钟</p>
+      </div>
+
+      <div class="qr-guide">
+        <h3>手机操作</h3>
+        <ol>
+          <li><span>1</span><p>打开抖音 App，点击左上角菜单。</p></li>
+          <li><span>2</span><p>选择“扫一扫”，扫描左侧二维码。</p></li>
+          <li><span>3</span><p>在手机上确认登录，账号会自动保存。</p></li>
+        </ol>
+        <div class="qr-security-note">
+          <strong>登录凭证不会显示在网页中</strong>
+          <span>成功后仅写入 VPS 的私有数据卷，不写日志、不上传 GitHub。</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="qrDetails" class="qr-details" hidden>
+      <h3>补充账号资料</h3>
+      <p>登录已经成功，但抖音页面没有返回完整资料。补充下面两项即可保存，无需配置 Cookie。</p>
+      <div class="form-grid two-columns">
+        <div class="field">
+          <label for="qrUniqueId">登录账号的抖音号</label>
+          <input id="qrUniqueId" type="text" maxlength="64" autocomplete="off" placeholder="例如 1234567890">
+        </div>
+        <div class="field">
+          <label for="qrUsername">显示名称</label>
+          <input id="qrUsername" type="text" maxlength="120" autocomplete="off" placeholder="例如 MinG">
+        </div>
+      </div>
+    </div>
+
+    <div class="qr-dialog-actions">
+      <button id="qrRestart" class="button ghost" type="button" hidden>重新生成二维码</button>
+      <span class="qr-action-spacer"></span>
+      <button id="qrCancel" class="button ghost" type="button">取消</button>
+      <button id="qrConfirm" class="button primary" type="button" hidden>保存账号</button>
     </div>
   </dialog>
 

@@ -14,6 +14,7 @@
   const ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
   const MAX_COOKIE_FILE_SIZE = 2 * 1024 * 1024;
   const POLL_INTERVAL = 7000;
+  const QR_POLL_INTERVAL = 2000;
 
   const $ = (id) => document.getElementById(id);
   const basePath = location.pathname.endsWith("/") ? location.pathname : `${location.pathname}/`;
@@ -27,6 +28,11 @@
   let requestInFlight = false;
   let logText = "";
   let toastTimer = null;
+  let qrPollTimer = null;
+  let qrImageRevision = 0;
+  let qrImageObjectUrl = "";
+  let qrState = "";
+  let qrCompletionHandled = false;
 
   function escapeHtml(value) {
     return String(value ?? "").replace(/[&<>"']/g, (character) => ({
@@ -363,7 +369,7 @@
     if (!accounts.length) {
       $("accounts").innerHTML = `
         <div class="empty-state">
-          <div><strong>还没有发送账号</strong><span>添加账号后，填写抖音号、目标好友和 Cookie。</span></div>
+          <div><strong>还没有发送账号</strong><span>推荐使用“扫码添加”；登录成功后只需填写目标好友。</span></div>
         </div>`;
       updateActionState();
       return;
@@ -422,7 +428,7 @@
             </div>
 
             <div class="cookie-area">
-              <p class="form-section-title">登录 Cookie</p>
+              <p class="form-section-title">备用登录方式</p>
               <div class="cookie-callout"><span aria-hidden="true">●</span><span>Cookie 相当于登录凭证。网页不会回显已保存内容，也不要把文件发送给别人。</span></div>
               <div class="field">
                 <label for="account-${index}-cookie-file">上传 Cookie JSON 文件</label>
@@ -614,15 +620,22 @@
     const saveButton = $("save");
     const runButton = $("run");
     const addButton = $("addAccount");
+    const scanButton = $("scanAccount");
     const saveState = document.querySelector(".save-state");
+    const qrOpen = Boolean($("qrDialog")?.open);
 
     saveButton.disabled = !dirty || running || Boolean(busyAction) || pendingCookie;
     runButton.disabled = dirty || running || Boolean(busyAction) || counts.accounts === 0 || counts.targets === 0;
     addButton.disabled = running || Boolean(busyAction) || counts.accounts >= 20 || pendingCookie;
+    scanButton.disabled = dirty || running || Boolean(busyAction) || counts.accounts >= 20 || pendingCookie || qrOpen;
 
     saveButton.classList.toggle("loading", busyAction === "save");
     runButton.classList.toggle("loading", busyAction === "run");
     $("refresh").classList.toggle("loading", busyAction === "refresh");
+    scanButton.classList.toggle("loading", busyAction === "qr");
+    scanButton.innerHTML = busyAction === "qr"
+      ? "正在启动…"
+      : '<span aria-hidden="true">▦</span>扫码添加';
     saveButton.textContent = busyAction === "save" ? "保存中…" : "保存更改";
     runButton.textContent = busyAction === "run" ? "启动中…" : running ? "任务运行中" : "立即运行";
 
@@ -657,6 +670,12 @@
     else if (!counts.accounts) runButton.title = "请先添加账号";
     else if (!counts.targets) runButton.title = "请先添加目标好友";
     else runButton.removeAttribute("title");
+
+    if (dirty) scanButton.title = "请先保存当前更改再扫码添加账号";
+    else if (running) scanButton.title = "任务运行时不能扫码添加账号";
+    else if (counts.accounts >= 20) scanButton.title = "最多支持 20 个账号";
+    else if (qrOpen) scanButton.title = "扫码窗口已打开";
+    else scanButton.removeAttribute("title");
   }
 
   class FormValidationError extends Error {
@@ -874,6 +893,272 @@
     showToast("新账号已加入草稿，填写后请保存更改");
   }
 
+  function stopQrPolling() {
+    window.clearTimeout(qrPollTimer);
+    qrPollTimer = null;
+  }
+
+  function releaseQrImage() {
+    if (qrImageObjectUrl) URL.revokeObjectURL(qrImageObjectUrl);
+    qrImageObjectUrl = "";
+    qrImageRevision = 0;
+    const image = $("qrImage");
+    image.removeAttribute("src");
+    image.hidden = true;
+  }
+
+  function showQrPlaceholder(message, type = "loading") {
+    $("qrImage").hidden = true;
+    const placeholder = $("qrPlaceholder");
+    placeholder.hidden = false;
+    placeholder.className = `qr-placeholder ${type}`;
+    if (type === "loading") {
+      placeholder.innerHTML = '<span class="qr-spinner" aria-hidden="true"></span><span></span>';
+    } else if (type === "success") {
+      placeholder.innerHTML = '<span class="qr-success-mark" aria-hidden="true">✓</span><span></span>';
+    } else {
+      placeholder.innerHTML = '<span class="qr-success-mark" aria-hidden="true">!</span><span></span>';
+    }
+    placeholder.lastElementChild.textContent = message;
+  }
+
+  function resetQrDialog() {
+    stopQrPolling();
+    releaseQrImage();
+    qrState = "starting";
+    qrCompletionHandled = false;
+    $("qrDetails").hidden = true;
+    $("qrUniqueId").value = "";
+    $("qrUsername").value = "";
+    $("qrUniqueId").classList.remove("invalid");
+    $("qrUsername").classList.remove("invalid");
+    $("qrRestart").hidden = true;
+    $("qrConfirm").hidden = true;
+    $("qrConfirm").disabled = false;
+    $("qrConfirm").textContent = "保存账号";
+    $("qrCancel").textContent = "取消";
+    $("qrStatusDot").className = "qr-status-dot";
+    $("qrStatusTitle").textContent = "正在连接抖音";
+    $("qrMessage").textContent = "二维码只会在本次登录期间临时保存在服务器内存中。";
+    $("qrCountdown").textContent = "有效时间约 5 分钟";
+    showQrPlaceholder("正在生成二维码…");
+  }
+
+  async function loadQrImage(revision) {
+    if (!revision || revision === qrImageRevision) return;
+    try {
+      const response = await api("api/qr-login/image");
+      if (!response.ok) return;
+      const blob = await response.blob();
+      if (!blob.size || blob.size > 512 * 1024 || !blob.type.startsWith("image/")) return;
+      const nextUrl = URL.createObjectURL(blob);
+      const previousUrl = qrImageObjectUrl;
+      qrImageObjectUrl = nextUrl;
+      qrImageRevision = revision;
+      const image = $("qrImage");
+      image.onload = () => {
+        image.hidden = false;
+        $("qrPlaceholder").hidden = true;
+        if (previousUrl) URL.revokeObjectURL(previousUrl);
+      };
+      image.src = nextUrl;
+    } catch (_error) {
+      // The next status poll will retry without exposing QR response details.
+    }
+  }
+
+  function qrStatusTitle(status) {
+    return ({
+      starting: "正在生成二维码",
+      waiting_scan: "等待扫码",
+      scanned: "已扫码，等待确认",
+      saving: "正在识别账号",
+      needs_details: "登录成功，请补充资料",
+      complete: "账号配置完成",
+      expired: "二维码已过期",
+      cancelled: "扫码登录已取消",
+      error: "扫码登录失败",
+    })[status] || "扫码登录";
+  }
+
+  async function renderQrStatus(status) {
+    qrState = status.status || "error";
+    $("qrStatusTitle").textContent = qrStatusTitle(qrState);
+    $("qrMessage").textContent = status.message || "正在等待抖音返回登录状态…";
+    const expiresIn = Math.max(0, Number(status.expiresIn) || 0);
+    $("qrCountdown").textContent = expiresIn
+      ? `本次二维码还可使用约 ${Math.ceil(expiresIn / 60)} 分钟`
+      : "本次扫码会话即将结束";
+
+    const isError = ["expired", "cancelled", "error"].includes(qrState);
+    const isComplete = qrState === "complete";
+    $("qrStatusDot").className = `qr-status-dot${isError ? " error" : isComplete ? " success" : ""}`;
+    $("qrRestart").hidden = !isError;
+    $("qrConfirm").hidden = qrState !== "needs_details";
+    $("qrDetails").hidden = qrState !== "needs_details";
+    $("qrCancel").textContent = isComplete ? "完成" : "取消";
+
+    if (status.qrReady && ["waiting_scan", "scanned"].includes(qrState)) {
+      await loadQrImage(status.qrRevision);
+    } else if (qrState === "starting") {
+      showQrPlaceholder("正在生成二维码…");
+    } else if (qrState === "saving") {
+      showQrPlaceholder("手机已确认，正在安全保存账号…", "success");
+    } else if (qrState === "needs_details") {
+      showQrPlaceholder("登录凭证已取得", "success");
+      if (!$("qrUniqueId").value && status.detected?.unique_id) {
+        $("qrUniqueId").value = status.detected.unique_id;
+      }
+      if (!$("qrUsername").value && status.detected?.username) {
+        $("qrUsername").value = status.detected.username;
+      }
+    } else if (isComplete) {
+      showQrPlaceholder("账号已安全保存", "success");
+    } else if (isError) {
+      showQrPlaceholder(status.message || "请重新生成二维码", "error");
+    }
+
+    if (isComplete && !qrCompletionHandled) {
+      qrCompletionHandled = true;
+      await refreshState();
+      const accountName = status.account?.username || "抖音账号";
+      showToast(status.created === false
+        ? `${accountName} 的登录状态已更新`
+        : `${accountName} 已添加，请填写目标好友`);
+      window.setTimeout(() => {
+        closeQrDialog({ cancelSession: false });
+        const accountId = status.account?.unique_id;
+        const card = [...document.querySelectorAll(".account-card")]
+          .find((item) => item.dataset.originalUniqueId === accountId);
+        card?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 1100);
+    }
+  }
+
+  function scheduleQrPoll() {
+    stopQrPolling();
+    if (!$("qrDialog").open) return;
+    if (["complete", "expired", "cancelled", "error"].includes(qrState)) return;
+    qrPollTimer = window.setTimeout(pollQrLogin, QR_POLL_INTERVAL);
+  }
+
+  async function pollQrLogin() {
+    if (!$("qrDialog").open) return;
+    try {
+      const response = await api("api/qr-login/status");
+      if (!response.ok) throw new Error(await responseError(response));
+      await renderQrStatus(await response.json());
+    } catch (error) {
+      $("qrMessage").textContent = error.message || "登录状态暂时无法读取，正在重试…";
+    }
+    scheduleQrPoll();
+  }
+
+  async function beginQrLogin() {
+    if (dirty) {
+      showToast("请先保存当前更改，再扫码添加账号", "error");
+      return;
+    }
+    if (appState?.status?.running || busyAction) return;
+    if ((appState?.config?.accounts || []).length >= 20) {
+      showToast("最多支持 20 个账号", "error");
+      return;
+    }
+
+    const dialog = $("qrDialog");
+    resetQrDialog();
+    if (!dialog.open) dialog.showModal();
+    busyAction = "qr";
+    updateActionState();
+    try {
+      let response = await api("api/qr-login/start", { method: "POST" });
+      if (response.status === 409) {
+        const existing = await api("api/qr-login/status");
+        if (existing.ok) {
+          await renderQrStatus(await existing.json());
+          scheduleQrPoll();
+          return;
+        }
+      }
+      if (!response.ok) throw new Error(await responseError(response));
+      await renderQrStatus(await response.json());
+      scheduleQrPoll();
+    } catch (error) {
+      qrState = "error";
+      $("qrStatusTitle").textContent = "无法启动扫码登录";
+      $("qrMessage").textContent = error.message || "请稍后重试";
+      $("qrStatusDot").className = "qr-status-dot error";
+      $("qrRestart").hidden = false;
+      showQrPlaceholder(error.message || "请稍后重试", "error");
+    } finally {
+      busyAction = null;
+      updateActionState();
+    }
+  }
+
+  async function restartQrLogin() {
+    stopQrPolling();
+    $("qrRestart").disabled = true;
+    try {
+      await api("api/qr-login/cancel", { method: "POST" });
+    } catch (_error) {
+      // A missing or already-finished session can be replaced safely.
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 700));
+    $("qrRestart").disabled = false;
+    await beginQrLogin();
+  }
+
+  async function confirmQrDetails() {
+    const uniqueId = $("qrUniqueId").value.trim();
+    const username = $("qrUsername").value.trim();
+    if (!ID_PATTERN.test(uniqueId)) {
+      $("qrUniqueId").classList.add("invalid");
+      $("qrUniqueId").focus();
+      showToast("抖音号只能包含数字、字母、下划线或短横线", "error");
+      return;
+    }
+    if (!username) {
+      $("qrUsername").classList.add("invalid");
+      $("qrUsername").focus();
+      showToast("请填写显示名称", "error");
+      return;
+    }
+
+    const button = $("qrConfirm");
+    button.disabled = true;
+    button.textContent = "保存中…";
+    try {
+      const response = await api("api/qr-login/confirm", {
+        method: "POST",
+        body: JSON.stringify({ unique_id: uniqueId, username }),
+      });
+      if (!response.ok) throw new Error(await responseError(response));
+      await renderQrStatus(await response.json());
+    } catch (error) {
+      $("qrMessage").textContent = error.message || "账号保存失败，请检查后重试";
+      showToast(error.message || "账号保存失败", "error");
+    } finally {
+      button.disabled = false;
+      button.textContent = "保存账号";
+    }
+  }
+
+  async function closeQrDialog({ cancelSession = true } = {}) {
+    const dialog = $("qrDialog");
+    stopQrPolling();
+    if (cancelSession && ["starting", "waiting_scan", "scanned", "saving", "needs_details"].includes(qrState)) {
+      try {
+        await api("api/qr-login/cancel", { method: "POST" });
+      } catch (_error) {
+        // The server also expires abandoned QR sessions automatically.
+      }
+    }
+    releaseQrImage();
+    if (dialog.open) dialog.close();
+    updateActionState();
+  }
+
   async function saveConfig() {
     if (!dirty || busyAction || appState?.status?.running) return;
     let payload;
@@ -1043,6 +1328,10 @@
       const target = event.target;
       if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement)) return;
       if (target.type === "file") return;
+      if (target.closest("#qrDialog")) {
+        target.classList.remove("invalid");
+        return;
+      }
       target.classList.remove("invalid");
       setDirty(true);
       if (target.id === "messageTemplate") updateMessagePreview();
@@ -1055,6 +1344,7 @@
       const target = event.target;
       if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) return;
       if (target.type === "file") return;
+      if (target.closest("#qrDialog")) return;
       target.classList.remove("invalid");
       setDirty(true);
       if (target.id === "scheduleEnabled") toggleScheduleFields();
@@ -1062,7 +1352,18 @@
     });
 
     $("scheduleTime").addEventListener("blur", normaliseTimeField);
+    $("scanAccount").addEventListener("click", beginQrLogin);
     $("addAccount").addEventListener("click", addAccount);
+    $("qrRestart").addEventListener("click", restartQrLogin);
+    $("qrConfirm").addEventListener("click", confirmQrDetails);
+    $("qrClose").addEventListener("click", () => closeQrDialog());
+    $("qrCancel").addEventListener("click", () => closeQrDialog({
+      cancelSession: qrState !== "complete",
+    }));
+    $("qrDialog").addEventListener("cancel", (event) => {
+      event.preventDefault();
+      closeQrDialog({ cancelSession: qrState !== "complete" });
+    });
     $("save").addEventListener("click", saveConfig);
     $("run").addEventListener("click", runTask);
     $("refresh").addEventListener("click", async () => {

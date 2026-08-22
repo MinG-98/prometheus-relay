@@ -31,7 +31,7 @@
 
 ## 项目概览
 
-Prometheus Relay 使用 **Playwright + Chromium** 驱动抖音创作者中心，通过接近正常人工操作的方式向指定好友发送续火花消息。项目提供完整的 VPS 网页控制台，让账号、Cookie、目标好友、消息模板、运行计划和执行记录都能在一个页面中完成管理。
+Prometheus Relay 使用 **Playwright + Chromium** 驱动抖音创作者中心，通过接近正常人工操作的方式向指定好友发送续火花消息。项目提供完整的 VPS 网页控制台，让扫码登录、账号、目标好友、消息模板、运行计划和执行记录都能在一个页面中完成管理。
 
 它适合希望把任务放在自己的服务器上长期运行，同时又不想手动维护环境变量、Cron 和浏览器脚本的个人用户。
 
@@ -50,14 +50,15 @@ Prometheus Relay 使用 **Playwright + Chromium** 驱动抖音创作者中心，
 
 | 模块 | 能力 |
 | --- | --- |
-| 账号管理 | 支持多账号、多目标好友；保存后以摘要卡片展示，降低日常操作复杂度 |
-| Cookie 管理 | 支持 Cookie-Editor JSON 文件上传与手动粘贴；已保存内容不在网页回显 |
+| 扫码登录 | VPS 生成抖音登录二维码；手机确认后自动抓取 Cookie、识别昵称和抖音号并保存 |
+| 账号管理 | 支持多账号、多目标好友；重复扫码会刷新 Cookie 并保留已有目标好友 |
+| Cookie 备用 | 扫码不可用时仍可上传 Cookie-Editor JSON；已保存内容不会在网页回显 |
 | 自动执行 | 支持手动运行、每日定时、IANA 时区和失败重试；文件锁避免任务并发 |
 | 好友匹配 | 默认按抖音号精确匹配，也可在必要时切换为原始昵称匹配 |
 | 消息内容 | 支持固定模板和 `[API]` 一言占位符，可选择内容分类 |
 | 可观测性 | 提供服务状态、下次运行、任务范围、最近结果、历史记录与原始日志 |
 | 自托管安全 | 默认仅监听本机地址，支持 Basic Auth、非 Root 容器与私有持久化卷 |
-| 部署维护 | 提供 Docker Compose、systemd、健康检查与可选 GitHub Actions 工作流 |
+| 部署维护 | 提供 Docker Compose、systemd、健康检查、原子配置写入与私有持久化卷 |
 
 <a id="architecture"></a>
 
@@ -82,7 +83,7 @@ flowchart LR
 | `scheduler` | 读取网页计划并在指定时区触发任务 | 常驻 |
 | `worker` | 执行一次独立任务，适合 systemd 或命令行调用 | 按需 |
 
-所有服务共享同一私有数据卷。Cookie 不会写入 Docker 镜像，网页接口也不会返回已保存的 Cookie 内容。
+所有服务共享同一私有数据卷。扫码二维码仅临时保存在 Web 进程内存中；Cookie 不会写入 Docker 镜像，网页接口也不会返回已保存的 Cookie 内容。
 
 <a id="quick-start"></a>
 
@@ -123,11 +124,13 @@ PROMETHEUS_RELAY_ENV_FILE=/etc/prometheus-relay/web.env \
 
 ### 4. 完成首次任务
 
-1. 登录[抖音创作者中心](https://creator.douyin.com/)，导出当前账号的 Cookie JSON。
-2. 在控制台添加账号，填写显示名称与登录账号的抖音号。
-3. 上传 Cookie 文件，并逐行填写目标好友抖音号。
-4. 保存配置，先手动运行一次并检查日志。
+1. 在控制台点击“扫码添加”，等待 VPS 生成登录二维码。
+2. 使用抖音 App 扫码并在手机上确认；控制台会自动抓取 Cookie、昵称和抖音号。
+3. 打开刚添加的账号，逐行填写目标好友抖音号并保存配置。
+4. 先手动运行一次并检查日志。
 5. 验证消息发送正常后，再启用每日自动运行。
+
+扫码不可用时，可以使用账号编辑区中的 Cookie JSON 上传作为备用方式。
 
 > [!TIP]
 > 生产环境推荐使用仓库提供的 systemd 单元托管服务。完整命令、更新、备份和 Caddy 示例见 [Docker 网页部署说明](docs/docker-deployment.md)。
@@ -139,9 +142,8 @@ PROMETHEUS_RELAY_ENV_FILE=/etc/prometheus-relay/web.env \
 | 文档 | 适用场景 |
 | --- | --- |
 | [Docker 网页部署](docs/docker-deployment.md) | VPS 长期运行、systemd 托管、更新和备份 |
-| [配置说明](docs/配置生成器使用.md) | 获取账号信息、Cookie、目标好友与首次验证 |
+| [配置说明](docs/配置生成器使用.md) | 手动 Cookie 备用方式、目标好友与首次验证 |
 | [源代码部署](docs/源代码部署说明.md) | 本地开发、任务面板或无 Docker 环境 |
-| [GitHub Actions](docs/Action部署说明.md) | 临时运行或自行配置云端工作流 |
 | [安全策略](SECURITY.md) | 凭证保护与漏洞报告 |
 | [来源说明](NOTICE) | 上游项目、版权与主要改造内容 |
 
@@ -194,6 +196,7 @@ tests/      配置与运行状态测试
 - 不要直接向公网开放 `18081` 端口。
 - 将 `/etc/prometheus-relay/web.env` 权限保持为 `600`。
 - 备份数据卷后，应按敏感凭证文件进行保存和销毁。
+- 活跃二维码同样属于短时登录凭证，不要截图或转发给其他人。
 - Cookie 一旦泄露，应立即退出相关登录会话并重新登录。
 
 漏洞请通过 GitHub 仓库的私密安全报告入口提交，且只能使用脱敏测试数据。更多信息见 [SECURITY.md](SECURITY.md)。
@@ -204,7 +207,7 @@ tests/      配置与运行状态测试
 
 ## 来源与许可
 
-Prometheus Relay 派生自 [2061360308/DouYinSparkFlow](https://github.com/2061360308/DouYinSparkFlow)，并在 MIT 许可下独立维护。当前项目新增了自托管网页控制台、Cookie 文件上传、账号管理、每日调度、运行历史、Docker/systemd 部署与安全加固。
+Prometheus Relay 派生自 [2061360308/DouYinSparkFlow](https://github.com/2061360308/DouYinSparkFlow)，并在 MIT 许可下独立维护。当前项目新增了自托管网页控制台、扫码自动抓取 Cookie、账号管理、每日调度、运行历史、Docker/systemd 部署与安全加固。
 
 原作者及当前维护者版权均保留在 [LICENSE](LICENSE) 中，完整来源说明见 [NOTICE](NOTICE)。
 

@@ -4,6 +4,7 @@ import json
 import os
 import re
 import tempfile
+import threading
 from copy import deepcopy
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -21,6 +22,7 @@ LOG_PATH = DATA_DIR / "task.log"
 LOCK_PATH = DATA_DIR / "task.lock"
 HISTORY_PATH = DATA_DIR / "history.json"
 SCHEDULER_STATUS_PATH = DATA_DIR / "schedule-status.json"
+_CONFIG_LOCK = threading.RLock()
 
 SUPPORTED_LOG_LEVELS = {"Debug", "Info", "Warning", "Error"}
 DEFAULT_CONFIG = {
@@ -70,21 +72,23 @@ def _atomic_write_json(path: Path, value: object) -> None:
 
 
 def load_config() -> dict:
-    ensure_data_dir()
-    if not CONFIG_PATH.exists():
-        config = deepcopy(DEFAULT_CONFIG)
-        _atomic_write_json(CONFIG_PATH, config)
-        return config
+    with _CONFIG_LOCK:
+        ensure_data_dir()
+        if not CONFIG_PATH.exists():
+            config = deepcopy(DEFAULT_CONFIG)
+            _atomic_write_json(CONFIG_PATH, config)
+            return config
 
-    with CONFIG_PATH.open("r", encoding="utf-8") as handle:
-        config = json.load(handle)
-    if not isinstance(config, dict):
-        raise ValueError("配置文件必须是 JSON 对象")
-    return config
+        with CONFIG_PATH.open("r", encoding="utf-8") as handle:
+            config = json.load(handle)
+        if not isinstance(config, dict):
+            raise ValueError("配置文件必须是 JSON 对象")
+        return config
 
 
 def save_config(config: dict) -> None:
-    _atomic_write_json(CONFIG_PATH, config)
+    with _CONFIG_LOCK:
+        _atomic_write_json(CONFIG_PATH, config)
 
 
 def read_status() -> dict:
@@ -171,12 +175,70 @@ def _normalise_cookies(value, account_name: str):
             raise ValueError(f"{account_name} 的 Cookie 不是有效 JSON: {exc}") from exc
     if not isinstance(value, list) or not value:
         raise ValueError(f"{account_name} 必须提供非空 Cookie JSON 数组")
+    if len(value) > 200:
+        raise ValueError(f"{account_name} 的 Cookie 数量不能超过 200 条")
     cookies = []
     for index, cookie in enumerate(value):
         if not isinstance(cookie, dict):
             raise ValueError(f"{account_name} 的 Cookie 第 {index + 1} 项必须是对象")
+        name = cookie.get("name")
+        cookie_value = cookie.get("value")
+        if not isinstance(name, str) or not name or len(name) > 256:
+            raise ValueError(f"{account_name} 的 Cookie 第 {index + 1} 项名称不合法")
+        if not isinstance(cookie_value, str) or len(cookie_value) > 65536:
+            raise ValueError(f"{account_name} 的 Cookie 第 {index + 1} 项内容不合法")
         cookies.append(dict(cookie))
     return cookies
+
+
+def upsert_scanned_account(unique_id: str, username: str, cookies: list[dict]) -> tuple[dict, bool]:
+    """Insert or refresh an account discovered through the QR login flow."""
+    unique_id = str(unique_id or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", unique_id):
+        raise ValueError("未能识别有效的抖音号")
+    username = str(username or "").strip()[:120]
+    if not username:
+        raise ValueError("未能识别账号昵称")
+    normalised_cookies = _normalise_cookies(cookies, username)
+
+    with _CONFIG_LOCK:
+        config = load_config()
+        accounts = config.get("accounts", [])
+        if not isinstance(accounts, list):
+            raise ValueError("现有账号配置不合法")
+
+        created = True
+        stored_account = None
+        for account in accounts:
+            if not isinstance(account, dict) or str(account.get("unique_id", "")) != unique_id:
+                continue
+            account["username"] = username
+            account["cookies"] = normalised_cookies
+            account.setdefault("targets", [])
+            stored_account = account
+            created = False
+            break
+
+        if stored_account is None:
+            if len(accounts) >= 20:
+                raise ValueError("最多支持 20 个账号")
+            stored_account = {
+                "unique_id": unique_id,
+                "username": username,
+                "targets": [],
+                "cookies": normalised_cookies,
+            }
+            accounts.append(stored_account)
+
+        config["accounts"] = accounts
+        save_config(config)
+        return {
+            "unique_id": stored_account["unique_id"],
+            "username": stored_account["username"],
+            "targets": list(stored_account.get("targets", [])),
+            "hasCookies": True,
+            "cookieCount": len(normalised_cookies),
+        }, created
 
 
 def _normalise_schedule(value: object, defaults: dict) -> dict:

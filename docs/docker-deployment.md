@@ -27,7 +27,9 @@ sudo systemctl enable --now prometheus-relay-scheduler.service
 
 ## 网页配置
 
-打开网页后填写账号和目标好友。Cookie 可以直接选择 Cookie-Editor 导出的 JSON 文件（最大 2 MB），也可以手动粘贴。保存后的 Cookie 只显示数量，不会回显。
+打开网页后优先点击“扫码添加”：VPS 无头浏览器生成二维码，手机确认后自动抓取 Cookie、昵称和抖音号。随后只需编辑账号并填写目标好友。扫码会话和二维码只临时保存在 Web 进程内存中，最终 Cookie 写入私有数据卷且不会通过网页接口回显。
+
+如果扫码暂时不可用，也可以点击“手动添加”，选择 Cookie-Editor 导出的 JSON 文件（最大 2 MB）或手动粘贴。
 
 任务设置中可以启用每日定时运行，时间采用 `HH:MM`，时区采用 IANA 名称，例如 `Asia/Shanghai`。网页“立即运行”和调度器共用文件锁，避免任务并发。
 

@@ -27,12 +27,6 @@ def as_env_string(value) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
-def format_key_list(keys) -> str:
-    if not keys:
-        return "(none)"
-    return ", ".join(sorted(str(key) for key in keys))
-
-
 def main() -> None:
     vars_raw = os.getenv("VARS_JSON", "{}")
     secrets_raw = os.getenv("SECRETS_JSON", "{}")
@@ -57,9 +51,6 @@ def main() -> None:
         fail("SECRETS_JSON must be a JSON object")
 
     dotenv_map = {}
-    vars_keys = list(vars_map.keys())
-    secrets_keys = list(secrets_map.keys())
-
     with open(github_env, "a", encoding="utf-8") as env_file:
         for key, value in vars_map.items():
             env_value = as_env_string(value)
@@ -78,11 +69,8 @@ def main() -> None:
     print(
         "Exported all variables from VARS_JSON and SECRETS_JSON; .env refreshed."
     )
-    print(f"VARS_JSON exported ({len(vars_keys)}): {format_key_list(vars_keys)}")
-    print(
-        "SECRETS_JSON exported "
-        f"({len(secrets_keys)}): {format_key_list(secrets_keys)}"
-    )
+    print(f"VARS_JSON exported: {len(vars_map)} item(s)")
+    print(f"SECRETS_JSON exported: {len(secrets_map)} item(s)")
 
 
 if __name__ == "__main__":
