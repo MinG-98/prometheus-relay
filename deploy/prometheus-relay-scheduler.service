@@ -1,7 +1,7 @@
 [Unit]
 Description=Prometheus Relay scheduler
 Requires=docker.service
-After=docker.service
+After=docker.service prometheus-relay-web.service
 
 [Service]
 Type=oneshot
