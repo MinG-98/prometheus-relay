@@ -2,7 +2,7 @@ import os, sys
 import subprocess
 import traceback
 from playwright.sync_api import sync_playwright
-from utils.config import DEBUG, get_environment, Environment
+from utils.config import DEBUG, _env_bool, get_environment, Environment
 
 PLAYWRIGHT_BROWSERS_PATH = "../chrome"
 
@@ -23,26 +23,34 @@ def get_browser():
     :return: 浏览器实例
     """
 
-    headless = True
+    # Headless is the safe default for servers. Set DEBUG=true for verbose
+    # local diagnostics, or override it explicitly with HEADLESS=false.
+    headless = _env_bool(os.getenv("HEADLESS"), default=not DEBUG)
 
     env = get_environment()
-    if env == Environment.LOCAL:
-        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), PLAYWRIGHT_BROWSERS_PATH)
-        )
-        if DEBUG:
-            headless = False
-    elif env == Environment.PACKED:
-        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = os.path.abspath(
-            os.path.join(os.path.dirname(sys.executable), PLAYWRIGHT_BROWSERS_PATH)
-        )
+    # Respect an explicitly supplied browser path. Docker uses the browsers
+    # bundled in the Playwright base image; local/packed runs keep the legacy
+    # project-relative path when no override is provided.
+    if not os.getenv("PLAYWRIGHT_BROWSERS_PATH"):
+        if env == Environment.LOCAL:
+            os.environ["PLAYWRIGHT_BROWSERS_PATH"] = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), PLAYWRIGHT_BROWSERS_PATH)
+            )
+        elif env == Environment.PACKED:
+            os.environ["PLAYWRIGHT_BROWSERS_PATH"] = os.path.abspath(
+                os.path.join(os.path.dirname(sys.executable), PLAYWRIGHT_BROWSERS_PATH)
+            )
 
+    playwright = None
     try:
         # 启动浏览器
-        playwright = sync_playwright().start() 
+        playwright = sync_playwright().start()
         browser = playwright.chromium.launch(headless=headless)
         return playwright, browser
     except Exception as e:
+        if playwright is not None:
+            playwright.stop()
+
         # 捕获浏览器启动错误
         if "Executable doesn't exist" in str(e) and env != Environment.GITHUBACTION:
             print("浏览器可执行文件不存在！")
@@ -50,3 +58,4 @@ def get_browser():
             sys.exit(1)
         else:
             traceback.print_exc()
+            raise

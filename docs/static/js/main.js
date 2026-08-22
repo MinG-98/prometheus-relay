@@ -45,7 +45,7 @@ const app = createApp({
       MESSAGE_TEMPLATE:
         "[盖瑞]今日火花[加一]\n—— [右边] 每日一言 [左边] ——\n[API]",
       HITOKOTO_TYPES: ["文学", "影视", "诗词", "哲学"],
-      MATCH_MODE: "nickname",
+      MATCH_MODE: "short_id",
       BROWSER_TIMEOUT: 120000,
       FRIEND_LIST_WAIT_TIME: 2000,
       TASK_RETRY_TIMES: 3,

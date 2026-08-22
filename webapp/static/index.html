@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f7fb">
+  <title>Douyin Fire 控制台</title>
+  <link rel="stylesheet" href="static/app.css">
+  <script src="static/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#mainContent">跳到主要内容</a>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand" aria-label="Douyin Fire">
+        <span class="brand-mark" aria-hidden="true">火</span>
+        <span>
+          <strong>Douyin Fire</strong>
+          <small>续火花控制台</small>
+        </span>
+      </div>
+      <div id="headerStatus" class="status-pill neutral" role="status">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span>正在连接</span>
+      </div>
+    </div>
+  </header>
+
+  <main id="mainContent" class="page-shell">
+    <section class="overview" aria-labelledby="overviewTitle">
+      <div class="section-heading overview-heading">
+        <div>
+          <p class="eyebrow">运行概览</p>
+          <h1 id="overviewTitle">今天的任务</h1>
+        </div>
+        <button id="refresh" class="button ghost compact" type="button" aria-label="刷新页面状态">
+          <span aria-hidden="true">↻</span>
+          刷新
+        </button>
+      </div>
+
+      <div class="metric-grid" aria-live="polite">
+        <article class="metric-card accent-blue">
+          <span class="metric-label">当前任务</span>
+          <strong id="taskMetric" class="metric-value">加载中…</strong>
+          <span id="taskMetricMeta" class="metric-meta">正在读取运行状态</span>
+        </article>
+        <article class="metric-card accent-violet">
+          <span class="metric-label">下次定时</span>
+          <strong id="scheduleMetric" class="metric-value">加载中…</strong>
+          <span id="scheduleMetricMeta" class="metric-meta">正在读取调度器</span>
+        </article>
+        <article class="metric-card accent-cyan">
+          <span class="metric-label">任务范围</span>
+          <strong id="accountsMetric" class="metric-value">—</strong>
+          <span id="accountsMetricMeta" class="metric-meta">—</span>
+        </article>
+        <article class="metric-card accent-green">
+          <span class="metric-label">最近结果</span>
+          <strong id="lastRunMetric" class="metric-value">尚未运行</strong>
+          <span id="lastRunMetricMeta" class="metric-meta">暂无记录</span>
+        </article>
+      </div>
+    </section>
+
+    <div class="content-grid">
+      <div class="main-column">
+        <section class="panel" aria-labelledby="dailySettingsTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">日常设置</p>
+              <h2 id="dailySettingsTitle">消息与定时</h2>
+            </div>
+          </div>
+
+          <div class="field">
+            <div class="label-row">
+              <label for="messageTemplate">发送内容</label>
+              <span id="messageCount" class="field-count">0 / 2000</span>
+            </div>
+            <textarea id="messageTemplate" rows="4" maxlength="2000" placeholder="例如：续火花"></textarea>
+            <p class="field-help">写入 <code>[API]</code> 会在每次运行时替换成一条“一言”。</p>
+          </div>
+
+          <div class="message-preview" aria-labelledby="previewTitle">
+            <div class="preview-head">
+              <span id="previewTitle">发送预览</span>
+              <span>示意内容</span>
+            </div>
+            <p id="messagePreview">续火花</p>
+          </div>
+
+          <div class="schedule-box">
+            <div class="switch-row">
+              <div>
+                <label for="scheduleEnabled" class="switch-title">每天自动运行</label>
+                <p>VPS 调度器会按指定时区每天执行一次。</p>
+              </div>
+              <label class="switch" aria-label="启用每天自动运行">
+                <input id="scheduleEnabled" type="checkbox">
+                <span class="switch-track" aria-hidden="true"></span>
+              </label>
+            </div>
+            <div id="scheduleFields" class="form-grid two-columns schedule-fields">
+              <div class="field">
+                <label for="scheduleTime">运行时间（24 小时制）</label>
+                <input id="scheduleTime" type="text" inputmode="numeric" maxlength="5" placeholder="07:40" autocomplete="off">
+              </div>
+              <div class="field">
+                <label for="scheduleTimezone">时区</label>
+                <input id="scheduleTimezone" type="text" list="timezoneOptions" placeholder="Asia/Shanghai" autocomplete="off">
+                <datalist id="timezoneOptions">
+                  <option value="Asia/Shanghai">北京时间</option>
+                  <option value="America/New_York">美国东部时间</option>
+                  <option value="America/Los_Angeles">美国西部时间</option>
+                  <option value="UTC">协调世界时</option>
+                </datalist>
+              </div>
+            </div>
+            <p id="scheduleSummary" class="inline-note">自动运行尚未启用。</p>
+          </div>
+
+          <details class="advanced-settings">
+            <summary>
+              <span>
+                <strong>高级设置</strong>
+                <small>匹配方式、超时、代理和一言类型</small>
+              </span>
+              <span class="summary-chevron" aria-hidden="true">⌄</span>
+            </summary>
+            <div class="advanced-body">
+              <div class="form-grid two-columns">
+                <div class="field">
+                  <label for="matchMode">好友匹配方式</label>
+                  <select id="matchMode">
+                    <option value="short_id">抖音号（推荐）</option>
+                    <option value="nickname">好友昵称</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="logLevel">日志级别</label>
+                  <select id="logLevel">
+                    <option value="Info">普通（Info）</option>
+                    <option value="Debug">详细（Debug）</option>
+                    <option value="Warning">仅警告（Warning）</option>
+                    <option value="Error">仅错误（Error）</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <label for="proxyAddress">浏览器代理</label>
+                <input id="proxyAddress" type="text" placeholder="留空表示不使用，例如 http://127.0.0.1:7890" autocomplete="off">
+                <p class="field-help">仅在 VPS 必须通过代理访问抖音时填写。</p>
+              </div>
+              <div class="form-grid three-columns">
+                <div class="field">
+                  <label for="browserTimeout">浏览器超时（秒）</label>
+                  <input id="browserTimeout" type="number" min="1" max="600" step="1">
+                </div>
+                <div class="field">
+                  <label for="friendListTimeout">好友加载等待（秒）</label>
+                  <input id="friendListTimeout" type="number" min="0" max="60" step="0.5">
+                </div>
+                <div class="field">
+                  <label for="taskRetryTimes">失败重试次数</label>
+                  <input id="taskRetryTimes" type="number" min="1" max="10" step="1">
+                </div>
+              </div>
+              <fieldset class="field checkbox-fieldset">
+                <legend>一言内容类型</legend>
+                <p class="field-help">只有发送内容包含 <code>[API]</code> 时才会使用。</p>
+                <div id="hitokotoTypes" class="checkbox-grid"></div>
+              </fieldset>
+            </div>
+          </details>
+        </section>
+
+        <section class="panel accounts-panel" aria-labelledby="accountsTitle">
+          <div class="section-heading account-heading">
+            <div>
+              <p class="eyebrow">发送账号</p>
+              <h2 id="accountsTitle">账号与目标好友</h2>
+              <p id="accountsDescription" class="section-description">每个账号使用各自的 Cookie 登录并向目标好友发送消息。</p>
+            </div>
+            <button id="addAccount" class="button secondary" type="button">
+              <span aria-hidden="true">＋</span>
+              添加账号
+            </button>
+          </div>
+          <div id="accounts" class="account-list" aria-describedby="accountsDescription">
+            <div class="loading-placeholder">正在读取账号…</div>
+          </div>
+        </section>
+      </div>
+
+      <aside class="side-column" aria-label="运行信息">
+        <section class="panel history-panel" aria-labelledby="historyTitle">
+          <div class="section-heading compact-heading">
+            <div>
+              <p class="eyebrow">执行记录</p>
+              <h2 id="historyTitle">最近运行</h2>
+            </div>
+          </div>
+          <div id="runHistory" class="history-list" aria-live="polite">
+            <div class="empty-compact">尚无运行记录</div>
+          </div>
+        </section>
+
+        <section class="panel log-panel" aria-labelledby="logTitle">
+          <details id="logDetails">
+            <summary>
+              <span>
+                <span class="eyebrow">排查问题</span>
+                <strong id="logTitle">原始运行日志</strong>
+              </span>
+              <span class="summary-chevron" aria-hidden="true">⌄</span>
+            </summary>
+            <div class="log-actions">
+              <span id="logUpdatedAt" class="muted">尚未读取</span>
+              <button id="copyLog" class="text-button" type="button">复制日志</button>
+            </div>
+            <pre id="logs" tabindex="0">暂无日志</pre>
+          </details>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <div class="action-bar" aria-label="配置操作">
+    <div class="action-bar-inner">
+      <div class="save-state">
+        <span id="dirtyIndicator" class="save-dot" aria-hidden="true"></span>
+        <span>
+          <strong id="saveStateTitle">配置已保存</strong>
+          <small id="saveStateHint">可以直接运行任务</small>
+        </span>
+      </div>
+      <div class="action-buttons">
+        <button id="save" class="button secondary" type="button" disabled>保存更改</button>
+        <button id="run" class="button primary" type="button" disabled>立即运行</button>
+      </div>
+    </div>
+  </div>
+
+  <dialog id="confirmDialog" class="confirm-dialog" aria-labelledby="confirmTitle" aria-describedby="confirmBody">
+    <div class="dialog-icon" aria-hidden="true">!</div>
+    <h2 id="confirmTitle">确认操作</h2>
+    <p id="confirmBody"></p>
+    <div class="dialog-actions">
+      <button id="confirmCancel" class="button ghost" type="button">取消</button>
+      <button id="confirmAction" class="button primary" type="button">确认</button>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+  <noscript>此控制台需要启用 JavaScript。</noscript>
+</body>
+</html>
