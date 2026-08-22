@@ -17,12 +17,17 @@ from webapp.config_store import (
 from webapp.task_runner import run_once
 
 
-LOGGER = logging.getLogger("douyin-fire-scheduler")
+LOGGER = logging.getLogger("prometheus-relay-scheduler")
 
 
 def _poll_interval() -> float:
     try:
-        value = float(os.getenv("DOUYIN_SCHEDULER_POLL_SECONDS", "15"))
+        value = float(
+            os.getenv(
+                "PROMETHEUS_RELAY_SCHEDULER_POLL_SECONDS",
+                os.getenv("DOUYIN_SCHEDULER_POLL_SECONDS", "15"),
+            )
+        )
     except ValueError:
         value = 15.0
     return max(5.0, min(value, 60.0))

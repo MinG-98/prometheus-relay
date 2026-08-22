@@ -9,7 +9,12 @@ from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
-DATA_DIR = Path(os.getenv("DOUYIN_DATA_DIR", "/app/data"))
+DATA_DIR = Path(
+    os.getenv(
+        "PROMETHEUS_RELAY_DATA_DIR",
+        os.getenv("DOUYIN_DATA_DIR", "/app/data"),
+    )
+)
 CONFIG_PATH = DATA_DIR / "config.json"
 STATUS_PATH = DATA_DIR / "status.json"
 LOG_PATH = DATA_DIR / "task.log"

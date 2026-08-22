@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title description" viewBox="0 0 1200 360">
+  <title id="title">Prometheus Relay</title>
+  <desc id="description">Keep the fire alive</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#121629"/>
+      <stop offset="0.56" stop-color="#252052"/>
+      <stop offset="1" stop-color="#3f234a"/>
+    </linearGradient>
+    <linearGradient id="ember" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff6b35"/>
+      <stop offset="0.55" stop-color="#ff9f1c"/>
+      <stop offset="1" stop-color="#ffe169"/>
+    </linearGradient>
+    <linearGradient id="relay" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff8a3d"/>
+      <stop offset="1" stop-color="#8b7cff"/>
+    </linearGradient>
+    <filter id="glow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="1200" height="360" rx="30" fill="url(#background)"/>
+  <circle cx="110" cy="50" r="180" fill="#7569f6" opacity=".08"/>
+  <circle cx="1125" cy="330" r="220" fill="#ff7a37" opacity=".08"/>
+
+  <g transform="translate(88 72)">
+    <rect width="216" height="216" rx="54" fill="#ffffff" opacity=".07"/>
+    <path d="M119 27c8 36-18 49-25 73-5 18 5 29 16 36-4-20 10-32 22-45 3 24 23 37 23 66 0 31-22 55-49 55-32 0-58-25-58-59 0-43 39-58 49-91 9 10 15 23 12 39 18-21 24-44 10-74Z" fill="url(#ember)" filter="url(#glow)"/>
+    <circle cx="108" cy="159" r="18" fill="#fff4cf" opacity=".93"/>
+  </g>
+
+  <g transform="translate(362 99)">
+    <text y="68" fill="#ffffff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="65" font-weight="800" letter-spacing="2">PROMETHEUS</text>
+    <text y="137" fill="#d8d7f6" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="58" font-weight="300" letter-spacing="12">RELAY</text>
+    <text y="190" fill="#ffbc65" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="19" font-weight="700" letter-spacing="5">KEEP THE FIRE ALIVE.</text>
+  </g>
+
+  <g transform="translate(1017 74)" fill="none" stroke-linecap="round">
+    <path d="M0 24c60 15 30 96 93 111s17 102 78 115" stroke="url(#relay)" stroke-width="5" opacity=".7"/>
+    <circle cx="0" cy="24" r="10" fill="#ff9f1c" stroke="#ffe2a3" stroke-width="3"/>
+    <circle cx="93" cy="135" r="10" fill="#b187ff" stroke="#dfd6ff" stroke-width="3"/>
+    <circle cx="171" cy="250" r="10" fill="#ff763d" stroke="#ffd0b8" stroke-width="3"/>
+  </g>
+</svg>

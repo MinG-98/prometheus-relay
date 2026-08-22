@@ -1,42 +1,74 @@
 # Docker 网页部署
 
-项目在 VPS 上运行一个受 Basic Auth 保护的网页管理面板，后台仍使用 Playwright 执行任务。网页服务和每日任务共用 Docker 数据卷，Cookie 不会写进镜像。
+Prometheus Relay 由三个 Compose 服务组成：`web` 提供管理控制台，`scheduler` 负责每日计划，`worker` 执行单次浏览器任务。三者共享私有数据卷，Cookie 不会写入镜像。
 
 ## 首次部署
 
+以下示例将项目放在 `/opt/prometheus-relay`，配置放在 `/etc/prometheus-relay`：
+
 ```bash
-mkdir -p /etc/douyin-fire
-install -m 600 .env.web.example /etc/douyin-fire/web.env
-vim /etc/douyin-fire/web.env
-docker compose build --pull
-install -m 644 deploy/douyin-fire-web.service /etc/systemd/system/douyin-fire-web.service
-install -m 644 deploy/douyin-fire.service /etc/systemd/system/douyin-fire.service
-install -m 644 deploy/douyin-fire-scheduler.service /etc/systemd/system/douyin-fire-scheduler.service
-systemctl daemon-reload
-systemctl enable --now douyin-fire-web.service
-systemctl enable --now douyin-fire-scheduler.service
+sudo git clone https://github.com/MinG-98/prometheus-relay.git /opt/prometheus-relay
+cd /opt/prometheus-relay
+
+sudo mkdir -p /etc/prometheus-relay
+sudo install -m 600 .env.web.example /etc/prometheus-relay/web.env
+sudo editor /etc/prometheus-relay/web.env
+
+sudo docker compose build --pull
+sudo install -m 644 deploy/prometheus-relay-web.service /etc/systemd/system/
+sudo install -m 644 deploy/prometheus-relay-worker.service /etc/systemd/system/
+sudo install -m 644 deploy/prometheus-relay-scheduler.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now prometheus-relay-web.service
+sudo systemctl enable --now prometheus-relay-scheduler.service
 ```
 
-网页面板默认使用抖音号匹配目标好友，目标好友昵称可能改名或重名；也可以切换为昵称匹配。面板默认监听 `127.0.0.1:18081`，应通过 Caddy 或其他反向代理访问，不要直接暴露到公网。默认启用 Basic Auth；只有在入口已经由 VPN、IP 白名单或其他网关保护时，才应设置 `AUTH_ENABLED=false`。
+控制台默认监听 `127.0.0.1:18081`，应通过 Caddy、Nginx 或其他反向代理提供 HTTPS，不应直接暴露该端口。默认启用 Basic Auth；请在 `web.env` 中设置长且唯一的密码，并保持文件权限为 `600`。
 
 ## 网页配置
 
-打开网页后填写账号和目标好友；Cookie 可直接选择 Cookie-Editor 导出的 JSON 文件（最大 2 MB），也可以手动粘贴 JSON。已保存的 Cookie 只显示数量，不会回显。网页的“立即运行”会与每日定时任务共用锁，避免并发发送。
+打开网页后填写账号和目标好友。Cookie 可以直接选择 Cookie-Editor 导出的 JSON 文件（最大 2 MB），也可以手动粘贴。保存后的 Cookie 只显示数量，不会回显。
 
-在“任务设置”中可以启用每日定时运行，填写 `HH:MM` 时间和 IANA 时区（默认 `Asia/Shanghai`）。保存后由独立调度器读取配置并每天执行一次；关闭开关即可停用，不需要修改 systemd 文件。
+任务设置中可以启用每日定时运行，时间采用 `HH:MM`，时区采用 IANA 名称，例如 `Asia/Shanghai`。网页“立即运行”和调度器共用文件锁，避免任务并发。
 
-## 手动执行和查看日志
-
-```bash
-systemctl start douyin-fire.service
-journalctl -u douyin-fire.service -n 200 --no-pager
-```
-
-更新代码后重新构建并重启网页服务：
+## 手动运行与日志
 
 ```bash
-docker compose build --pull
-systemctl restart douyin-fire-web.service
+sudo systemctl start prometheus-relay-worker.service
+sudo journalctl -u prometheus-relay-worker.service -n 200 --no-pager
 ```
 
-定时任务默认关闭；启用后按网页中配置的时间和时区执行。Cookie 属于登录凭证，不要提交到 Git 或发送到聊天。
+网页内也可以直接运行任务并查看最近日志。
+
+## 更新
+
+```bash
+cd /opt/prometheus-relay
+sudo git pull --ff-only
+sudo docker compose build --pull
+sudo systemctl restart prometheus-relay-web.service
+sudo systemctl restart prometheus-relay-scheduler.service
+```
+
+更新前建议备份数据卷：
+
+```bash
+sudo docker run --rm \
+  -v prometheus-relay_prometheus_relay_data:/data:ro \
+  -v "$PWD":/backup \
+  alpine tar -czf /backup/prometheus-relay-data.tar.gz -C /data .
+```
+
+备份文件包含 Cookie，不要上传到公共位置。
+
+## 反向代理示例
+
+Caddy：
+
+```caddyfile
+relay.example.com {
+    reverse_proxy 127.0.0.1:18081
+}
+```
+
+反向代理完成后访问 `https://relay.example.com`。`/healthz` 可用于本机健康检查，但外部访问仍应经过统一的访问控制策略。

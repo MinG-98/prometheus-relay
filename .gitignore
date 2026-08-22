@@ -1,8 +1,12 @@
 .venv/
 **/__pycache__/
+.pytest_cache/
+.coverage
 .vscode/
 chrome/
 logs/
+/data/
+prometheus-relay-data.tar.gz
 .DS_Store
 usersData.json
 .env

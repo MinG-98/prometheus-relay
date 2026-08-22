@@ -1,0 +1,14 @@
+Prometheus Relay
+Copyright (c) 2026 MinG-98
+
+This project is derived from DouYinSparkFlow:
+https://github.com/2061360308/DouYinSparkFlow
+Copyright (c) 2026 2061360308 盧瞳
+
+The upstream project was made available under the MIT License. Its copyright
+notice and license text are preserved in LICENSE and apply to substantial
+portions derived from the upstream work.
+
+Prometheus Relay is an independently maintained derivative. Major additions
+include its self-hosted web console, account and cookie management, scheduler,
+run history, Docker/systemd deployment, and security hardening.

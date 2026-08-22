@@ -1,5 +1,10 @@
 FROM mcr.microsoft.com/playwright/python:v1.58.0-noble
 
+LABEL org.opencontainers.image.title="Prometheus Relay" \
+      org.opencontainers.image.description="Self-hosted Douyin streak automation console" \
+      org.opencontainers.image.source="https://github.com/MinG-98/prometheus-relay" \
+      org.opencontainers.image.licenses="MIT"
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \

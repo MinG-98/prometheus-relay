@@ -77,7 +77,11 @@ def run_once(trigger: str | None = None) -> int:
     if existing_status.get("running"):
         return 2
 
-    trigger = (trigger or os.getenv("DOUYIN_TRIGGER", "system")).strip().lower()
+    trigger = (
+        trigger
+        or os.getenv("PROMETHEUS_RELAY_TRIGGER")
+        or os.getenv("DOUYIN_TRIGGER", "system")
+    ).strip().lower()
     if trigger not in {"manual", "schedule", "system"}:
         trigger = "system"
     account_count = len(config.get("accounts", []))

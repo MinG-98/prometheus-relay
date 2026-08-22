@@ -1,1 +1,1 @@
-"""Web management application for Douyin Fire."""
+"""Prometheus Relay web management application."""

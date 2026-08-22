@@ -106,16 +106,11 @@ button {
 }
 
 .brand-mark {
-  display: grid;
+  display: block;
   width: 38px;
   height: 38px;
-  place-items: center;
   border-radius: 12px;
-  background: linear-gradient(145deg, #6a66f0, #4b48d3);
   box-shadow: 0 8px 18px rgba(90, 87, 232, 0.25);
-  color: #fff;
-  font-size: 18px;
-  font-weight: 800;
 }
 
 .brand strong,
@@ -125,7 +120,7 @@ button {
 
 .brand strong {
   font-size: 15px;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.025em;
 }
 
 .brand small {

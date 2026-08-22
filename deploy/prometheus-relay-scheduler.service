@@ -1,15 +1,15 @@
 [Unit]
-Description=Douyin Fire schedule worker
+Description=Prometheus Relay scheduler
 Requires=docker.service
 After=docker.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory=/opt/douyin-fire
-Environment=COMPOSE_PROJECT_NAME=douyin-fire
-Environment=DOUYIN_WEB_ENV_FILE=/etc/douyin-fire/web.env
-ExecStartPre=/usr/bin/test -s /etc/douyin-fire/web.env
+WorkingDirectory=/opt/prometheus-relay
+Environment=COMPOSE_PROJECT_NAME=prometheus-relay
+Environment=PROMETHEUS_RELAY_ENV_FILE=/etc/prometheus-relay/web.env
+ExecStartPre=/usr/bin/test -s /etc/prometheus-relay/web.env
 ExecStart=/usr/bin/docker compose up -d scheduler
 ExecStop=/usr/bin/docker compose stop scheduler
 TimeoutStartSec=5min

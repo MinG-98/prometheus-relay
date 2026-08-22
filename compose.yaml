@@ -3,61 +3,61 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: douyin-fire:local
+    image: prometheus-relay:local
     env_file:
-      - ${DOUYIN_WEB_ENV_FILE:-.env}
+      - ${PROMETHEUS_RELAY_ENV_FILE:-.env}
     environment:
       PYTHONUNBUFFERED: "1"
-      DOUYIN_DATA_DIR: /app/data
+      PROMETHEUS_RELAY_DATA_DIR: /app/data
     init: true
     ipc: host
     user: appuser
     security_opt:
       - no-new-privileges:true
     volumes:
-      - douyin_data:/app/data
-      - douyin_logs:/app/logs
+      - prometheus_relay_data:/app/data
+      - prometheus_relay_logs:/app/logs
     ports:
       - "127.0.0.1:18081:8000"
     command: ["uvicorn", "webapp.main:app", "--host", "0.0.0.0", "--port", "8000"]
     restart: unless-stopped
 
   worker:
-    image: douyin-fire:local
+    image: prometheus-relay:local
     env_file:
-      - ${DOUYIN_WEB_ENV_FILE:-.env}
+      - ${PROMETHEUS_RELAY_ENV_FILE:-.env}
     environment:
       PYTHONUNBUFFERED: "1"
-      DOUYIN_DATA_DIR: /app/data
+      PROMETHEUS_RELAY_DATA_DIR: /app/data
     init: true
     ipc: host
     user: appuser
     security_opt:
       - no-new-privileges:true
     volumes:
-      - douyin_data:/app/data
-      - douyin_logs:/app/logs
+      - prometheus_relay_data:/app/data
+      - prometheus_relay_logs:/app/logs
     command: ["python", "-m", "webapp.task_runner"]
     restart: "no"
 
   scheduler:
-    image: douyin-fire:local
+    image: prometheus-relay:local
     env_file:
-      - ${DOUYIN_WEB_ENV_FILE:-.env}
+      - ${PROMETHEUS_RELAY_ENV_FILE:-.env}
     environment:
       PYTHONUNBUFFERED: "1"
-      DOUYIN_DATA_DIR: /app/data
+      PROMETHEUS_RELAY_DATA_DIR: /app/data
     init: true
     ipc: host
     user: appuser
     security_opt:
       - no-new-privileges:true
     volumes:
-      - douyin_data:/app/data
-      - douyin_logs:/app/logs
+      - prometheus_relay_data:/app/data
+      - prometheus_relay_logs:/app/logs
     command: ["python", "-m", "webapp.scheduler"]
     restart: unless-stopped
 
 volumes:
-  douyin_data:
-  douyin_logs:
+  prometheus_relay_data:
+  prometheus_relay_logs:

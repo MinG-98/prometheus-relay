@@ -1,70 +1,88 @@
-# DouYin Spark Flow
+# Prometheus Relay
 
-![cover](docs/images/cover.png)
+<p align="center">
+  <img src="docs/images/prometheus-relay-banner.svg" alt="Prometheus Relay — Keep the fire alive" width="100%">
+</p>
 
-![Python](https://img.shields.io/badge/Python-3.8%2B-blue?logo=python)
-![Playwright](https://img.shields.io/badge/Playwright-%E2%9C%94-green?logo=playwright)
-![chrome-headless-shell](https://img.shields.io/badge/chrome--headless--shell-%E2%9C%94-brightgreen?logo=googlechrome)
+<p align="center">
+  <strong>Keep the fire alive.</strong><br>
+  一套面向个人自托管场景的抖音火花自动维护工具。
+</p>
 
-> `dev`分支迁移到`https://www.douyin.com/chat` 加载更稳定，支持通过备注/昵称/抖音号等多种方式智能匹配。由于`https://www.douyin.com/chat`没经过长期测试，该分支目前暂不合并。有能力的可以研究一下
+<p align="center">
+  <img alt="Python 3.11+" src="https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white">
+  <img alt="Playwright" src="https://img.shields.io/badge/Playwright-Chromium-2EAD33?logo=playwright&logoColor=white">
+  <img alt="Docker" src="https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white">
+  <img alt="License MIT" src="https://img.shields.io/badge/License-MIT-f59e0b">
+</p>
 
-## 贡献者
+Prometheus Relay 使用 Playwright 驱动无头 Chromium，通过抖音创作者中心模拟正常的网页操作，按计划向指定好友发送续火花消息。它提供一个适合 VPS 长期运行的网页控制台，账号、Cookie、目标好友、消息模板和每日计划均可在浏览器中管理。
 
-感谢所有为本项目做出贡献的开发者：
+## 功能
 
-[![contributors](https://contrib.rocks/image?repo=2061360308/DouYinSparkFlow)](https://github.com/2061360308/DouYinSparkFlow/graphs/contributors)
+- 多账号、多目标好友
+- 默认按抖音号匹配，也支持昵称匹配
+- Cookie JSON 文件上传与安全存储
+- 每日定时执行、手动执行和并发锁
+- 运行状态、历史记录与日志查看
+- Basic Auth 网页访问保护
+- Docker Compose、systemd 与 GitHub Actions
+- 可选“一言”消息内容
 
-## 📌 项目介绍
+## 快速部署
 
-**抖音火花自动续火脚本**一款轻量实用的抖音互动脚本，可自动为你和抖音好友续火花，无需手动操作。
+推荐使用 Docker Compose，并通过 Caddy、Nginx 或其他反向代理提供 HTTPS。
 
-✅ 支持 GitHub Actions 自动运行（开箱即用的 Workflow 配置）
+```bash
+git clone https://github.com/MinG-98/prometheus-relay.git
+cd prometheus-relay
 
-✅ 也可源码部署至自有服务器，青龙/白虎等任务管理面板，灵活适配个人使用场景
+sudo mkdir -p /etc/prometheus-relay
+sudo install -m 600 .env.web.example /etc/prometheus-relay/web.env
+sudo editor /etc/prometheus-relay/web.env
 
-### 特性/优势
+PROMETHEUS_RELAY_ENV_FILE=/etc/prometheus-relay/web.env \
+  docker compose up -d --build web scheduler
+```
 
-- [x] 在线可视化配置工具，新手也能入门操作
-- [x] Fork即用，无需克隆代码，配置运行环境
-- [x] 多用户,同时批量支持多个账户
-- [x] 多目标,一个账户支持多个续火花目标
-- [x] 支持按照昵称和抖音号两种方式查找好友目标
-- [x] 一言支持,更丰富的消息文本
+控制台默认只监听 `127.0.0.1:18081`。详细部署、systemd 托管和升级步骤见 [Docker 部署说明](docs/docker-deployment.md)。
 
-使用`PlayWright`以及`chrome-headless-shell`自动化操作[抖音创作者中心](https://creator.douyin.com/)，进行定时发送抖音消息来续火花
+## 使用流程
 
-## 🚀 使用方法
+1. 登录抖音创作者中心。
+2. 使用 Cookie-Editor 等工具导出当前账号的 Cookie JSON 文件。
+3. 打开 Prometheus Relay 控制台，添加账号并上传 Cookie。
+4. 填写目标好友抖音号，保存配置。
+5. 先手动运行一次确认可用，再开启每日定时任务。
 
-**材料准备：** 一个 GitHub 账号和可用浏览器即可，不设额外门槛。
+Cookie 等同于登录凭证。请勿提交到 Git、粘贴到 Issue，或发送给他人。若 Cookie 曾经泄露，请立即在抖音退出相关登录会话并重新登录。
 
-**编辑项目配置：** 保姆级教程见 [配置生成器使用](docs/配置生成器使用.md)
+## 本地开发
 
-**部署方法：**
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python -m unittest discover -s tests -v
+```
 
-1. Github Action 部署（推荐👍），操作说明见 [Action部署说明](docs/Action部署说明.md)
+启动网页服务：
 
-2. 源码部署 （更适合高级用户），操作说明见[源代码部署说明](docs/源代码部署说明.md)
+```bash
+AUTH_ENABLED=false PROMETHEUS_RELAY_DATA_DIR=./data \
+  uvicorn webapp.main:app --reload
+```
 
-## 📢交流讨论
+## 项目来源
 
-已开放讨论区，有疑问或展示相关成果，发布话题需求的可以加入讨论
+Prometheus Relay 派生自 [2061360308/DouYinSparkFlow](https://github.com/2061360308/DouYinSparkFlow)，并在其 MIT 许可下继续开发。当前项目新增了 VPS 网页控制台、Cookie 文件上传、账号管理、每日调度、运行历史、Docker/systemd 部署和安全加固，并以独立项目持续维护。
 
-[跳转讨论区](https://github.com/2061360308/DouYinSparkFlow/discussions)
+完整版权和来源说明见 [LICENSE](LICENSE) 与 [NOTICE](NOTICE)。
 
-## ⭐Star 趋势
+## 使用边界
 
-## Star History
+本项目仅用于技术研究和个人自用，不得用于批量骚扰、恶意刷量或规避平台限制。自动化操作可能触发平台风控，使用者应遵守抖音服务协议及所在地法律，并自行承担账号限制、封禁或数据丢失等风险。建议仅配置少量真实好友，并使用合理的每日运行频率。
 
-[![Star History Chart](https://api.star-history.com/chart?repos=2061360308/DouYinSparkFlow&type=date&legend=top-left&sealed_token=TlokSbTx6LsGFZNndYzOzoSQ4ReFseZ4kWxbS4BP0V3WAsAsnXUUVxQPdyEOEWUpHtpTS7hlIpAJMa7C7KbbEp4QtLwyahXr41t2liypNktp0Z3Nh_V2eIBQzSyxWMiFxedN_xifd4Np_MxyHSHs6BrSe672ge7ovFimoLv-yucCt-TV_6opPkp9qltR)](https://www.star-history.com/?repos=2061360308%2FDouYinSparkFlow&type=date&legend=top-left)
+## License
 
-## ⚠️ 免责声明
-
-1. 本项目为**开源学习用途**，仅用于技术研究和个人自用，严禁用于商业用途、恶意刷量或违反抖音平台规则的行为。
-2. 使用本脚本产生的一切风险（包括但不限于抖音账号限流、封禁、处罚等）均由使用者自行承担，项目开发者不承担任何责任。
-3. 本项目仅调用公开的接口/模拟人工操作，不涉及破解、入侵抖音系统，使用者需遵守《抖音用户服务协议》及相关法律法规。
-4. 请合理控制脚本运行频率，避免给抖音平台服务器造成压力，建议仅用于个人少量好友的火花维系。
-5. 若你使用本项目即表示已阅读并同意本免责声明，如不同意请立即停止使用。
-
-## 📄 开源协议
-
-本项目基于 MIT 协议开源，你可以自由使用、修改和分发本项目代码，详见 [LICENSE](LICENSE) 文件。
+[MIT](LICENSE)

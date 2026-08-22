@@ -35,7 +35,12 @@ AUTH_ENABLED = str(os.getenv("AUTH_ENABLED", "true")).strip().lower() in {
     "on",
 }
 
-app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+app = FastAPI(
+    title="Prometheus Relay",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
 app.mount("/static", StaticFiles(directory=INDEX_PATH.parent), name="static")
 
 
@@ -49,7 +54,7 @@ def require_auth(request: Request) -> None:
         raise HTTPException(
             status_code=401,
             detail="需要登录",
-            headers={"WWW-Authenticate": 'Basic realm="Douyin Fire"'},
+            headers={"WWW-Authenticate": 'Basic realm="Prometheus Relay"'},
         )
     try:
         encoded = authorization[6:].strip()
@@ -64,7 +69,7 @@ def require_auth(request: Request) -> None:
         raise HTTPException(
             status_code=401,
             detail="用户名或密码错误",
-            headers={"WWW-Authenticate": 'Basic realm="Douyin Fire"'},
+            headers={"WWW-Authenticate": 'Basic realm="Prometheus Relay"'},
         )
 
 
@@ -118,7 +123,7 @@ def run(_: None = Depends(require_auth)):
     if read_status().get("running"):
         raise HTTPException(status_code=409, detail="已有任务正在运行")
     environment = os.environ.copy()
-    environment["DOUYIN_TRIGGER"] = "manual"
+    environment["PROMETHEUS_RELAY_TRIGGER"] = "manual"
     process = subprocess.Popen(
         [sys.executable, "-m", "webapp.task_runner"],
         cwd=PROJECT_ROOT,
