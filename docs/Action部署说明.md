@@ -1,31 +1,14 @@
 # GitHub Actions 运行说明
 
-Prometheus Relay 内置 `.github/workflows/manual-run.yml`，默认只允许手动触发，不会在新仓库中未经确认就自动运行。长期使用更推荐 VPS Docker 调度器。
+Prometheus Relay 不再提供通过 GitHub Actions 执行真实账号任务的工作流。
 
-## 准备 Environment
+抖音 Cookie 属于完整登录凭证。将所有仓库 Secrets 动态导出到公共仓库的 runner 文件，会扩大凭证出现在临时文件、调试输出或第三方 Action 中的风险；GitHub 托管 runner 的网络位置和执行时机也不适合长期维持账号会话。
 
-在 GitHub 仓库中进入 `Settings` → `Environments`，创建名为 `user-data` 的 Environment。
+请使用 [Docker 部署说明](docker-deployment.md) 在自己的 VPS 上运行：
 
-然后分别添加：
+- 扫码会话仅存在于 VPS 的 Web 进程内存；
+- 登录成功后的 Cookie 仅写入 VPS 私有数据卷；
+- 每日任务由 VPS 本机调度器执行；
+- GitHub Actions 只用于不接触真实账号凭证的测试与安全扫描。
 
-- Variables：`PROXY_ADDRESS`、`MESSAGE_TEMPLATE`、`HITOKOTO_TYPES`、`MATCH_MODE`、`BROWSER_TIMEOUT`、`FRIEND_LIST_WAIT_TIME`、`TASK_RETRY_TIMES`、`LOG_LEVEL` 和 `TASKS`
-- Secrets：每个账号对应一个 `COOKIES_<抖音号>`
-
-仓库内的 `docs/index.html` 是旧式纯前端环境变量生成器，可在本地打开辅助生成这些内容。Cookie 只在当前浏览器页面中处理，不要将生成器部署到不受信任的网站。
-
-## 手动运行
-
-进入仓库 `Actions` → `Prometheus Relay Manual Run` → `Run workflow`。运行结束后可下载保留 7 天的日志 artifact。
-
-## 可选定时触发
-
-若确定使用 GitHub Actions 定时运行，可在 `manual-run.yml` 的 `on` 下自行加入 `schedule`：
-
-```yaml
-on:
-  workflow_dispatch:
-  schedule:
-    - cron: "0 1 * * *"
-```
-
-GitHub Actions 的 cron 使用 UTC；示例为每天 UTC 01:00。定时工作流可能延迟，且平台规则、网络位置和 GitHub Actions 限制都可能影响稳定性。
+旧版纯前端环境变量生成器仅为源码模式兼容保留，不应部署到公共网站，也不要把生成结果提交到仓库。

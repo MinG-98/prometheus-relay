@@ -14,8 +14,8 @@ final login state only to the private data volume.
 The web console should listen on localhost and be served through HTTPS. Keep
 Basic Auth enabled unless another authenticated gateway fully protects it.
 Use HTTPS for QR login so the code and account metadata cannot be observed in
-transit. Public GitHub Actions runs are not recommended for real account tasks,
-because workflow logs in a public repository can reveal account metadata.
+transit. Do not use public GitHub Actions for real account tasks: keep account
+credentials and scheduled execution on the private VPS deployment.
 
 ## Reporting a vulnerability
 
