@@ -1,27 +1,23 @@
 from __future__ import annotations
 
-import json
 import logging
 import os
 import time
-from datetime import datetime
-from tempfile import NamedTemporaryFile
-from pathlib import Path
+from datetime import datetime, timezone as utc_timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from webapp.config_store import (
-    DATA_DIR,
     DEFAULT_CONFIG,
     _normalise_schedule,
-    ensure_data_dir,
     load_config,
+    read_scheduler_status,
     read_status,
+    write_scheduler_status,
 )
 from webapp.task_runner import run_once
 
 
 LOGGER = logging.getLogger("douyin-fire-scheduler")
-MARKER_PATH = DATA_DIR / "schedule-status.json"
 
 
 def _poll_interval() -> float:
@@ -32,33 +28,8 @@ def _poll_interval() -> float:
     return max(5.0, min(value, 60.0))
 
 
-def _read_last_run_key() -> str | None:
-    ensure_data_dir()
-    try:
-        with MARKER_PATH.open("r", encoding="utf-8") as handle:
-            value = json.load(handle)
-        key = value.get("lastRunKey") if isinstance(value, dict) else None
-        return str(key) if key else None
-    except (OSError, ValueError, json.JSONDecodeError):
-        return None
-
-
-def _write_last_run_key(key: str) -> None:
-    ensure_data_dir()
-    with NamedTemporaryFile(
-        mode="w",
-        encoding="utf-8",
-        dir=DATA_DIR,
-        prefix=".schedule-status.",
-        delete=False,
-    ) as handle:
-        json.dump({"lastRunKey": key}, handle, ensure_ascii=False)
-        handle.write("\n")
-        handle.flush()
-        os.fsync(handle.fileno())
-        temporary_path = Path(handle.name)
-    os.chmod(temporary_path, 0o600)
-    os.replace(temporary_path, MARKER_PATH)
+def _utc_now() -> str:
+    return datetime.now(utc_timezone.utc).isoformat()
 
 
 def _enabled_schedule(config: dict) -> tuple[str, str, ZoneInfo] | None:
@@ -81,12 +52,17 @@ def _enabled_schedule(config: dict) -> tuple[str, str, ZoneInfo] | None:
 
 def run_scheduler() -> None:
     interval = _poll_interval()
-    last_run_key = _read_last_run_key()
+    scheduler_status = read_scheduler_status()
+    last_run_key = scheduler_status.get("lastRunKey")
+    last_heartbeat = 0.0
     LOGGER.info("定时调度器已启动，检查间隔 %.0f 秒", interval)
     while True:
         try:
             config = load_config()
             schedule = _enabled_schedule(config)
+            now_monotonic = time.monotonic()
+            should_write_status = now_monotonic - last_heartbeat >= 60
+
             if schedule:
                 schedule_time, timezone_name, timezone = schedule
                 now = datetime.now(timezone)
@@ -94,14 +70,78 @@ def run_scheduler() -> None:
                 if now.strftime("%H:%M") == schedule_time and run_key != last_run_key:
                     if read_status().get("running"):
                         LOGGER.warning("到达定时运行时间，但已有任务运行，跳过本次任务")
+                        scheduler_status.update(
+                            {
+                                "lastSkippedAt": _utc_now(),
+                                "lastOutcome": "skipped-running",
+                            }
+                        )
                     else:
                         LOGGER.info("开始定时任务（%s %s）", now.strftime("%Y-%m-%d %H:%M"), timezone_name)
-                        exit_code = run_once()
+                        scheduler_status.update(
+                            {
+                                "heartbeatAt": _utc_now(),
+                                "enabled": True,
+                                "scheduleTime": schedule_time,
+                                "timezone": timezone_name,
+                                "state": "running",
+                                "lastTriggeredAt": _utc_now(),
+                            }
+                        )
+                        write_scheduler_status(scheduler_status)
+                        exit_code = run_once(trigger="schedule")
                         LOGGER.info("定时任务结束，退出码 %s", exit_code)
+                        scheduler_status.update(
+                            {
+                                "lastFinishedAt": _utc_now(),
+                                "lastExitCode": exit_code,
+                                "lastOutcome": "success" if exit_code == 0 else "failed",
+                            }
+                        )
                     last_run_key = run_key
-                    _write_last_run_key(run_key)
-        except (OSError, ValueError, json.JSONDecodeError) as exc:
-            LOGGER.error("读取定时配置失败: %s", exc)
+                    scheduler_status["lastRunKey"] = run_key
+                    should_write_status = True
+
+                if should_write_status:
+                    scheduler_status.update(
+                        {
+                            "heartbeatAt": _utc_now(),
+                            "enabled": True,
+                            "scheduleTime": schedule_time,
+                            "timezone": timezone_name,
+                            "state": "idle",
+                            "lastError": None,
+                        }
+                    )
+            elif should_write_status:
+                scheduler_status.update(
+                    {
+                        "heartbeatAt": _utc_now(),
+                        "enabled": False,
+                        "scheduleTime": None,
+                        "timezone": None,
+                        "state": "idle",
+                        "lastError": None,
+                    }
+                )
+
+            if should_write_status:
+                write_scheduler_status(scheduler_status)
+                last_heartbeat = now_monotonic
+        except Exception as exc:  # Keep the long-running scheduler alive after a bad poll.
+            LOGGER.exception("定时调度器检查失败: %s", exc)
+            try:
+                scheduler_status.update(
+                    {
+                        "heartbeatAt": _utc_now(),
+                        "state": "error",
+                        "lastError": str(exc)[:300],
+                    }
+                )
+                write_scheduler_status(scheduler_status)
+            except OSError:
+                LOGGER.exception("无法写入调度器状态")
+            last_heartbeat = time.monotonic()
         time.sleep(interval)
 
 

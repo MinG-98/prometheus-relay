@@ -10,12 +10,15 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from webapp.config_store import (
     load_config,
     normalise_config,
     public_config,
+    read_history,
     read_log,
+    read_scheduler_status,
     read_status,
     save_config,
 )
@@ -33,6 +36,7 @@ AUTH_ENABLED = str(os.getenv("AUTH_ENABLED", "true")).strip().lower() in {
 }
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+app.mount("/static", StaticFiles(directory=INDEX_PATH.parent), name="static")
 
 
 def require_auth(request: Request) -> None:
@@ -80,7 +84,12 @@ def state(_: None = Depends(require_auth)):
         config = load_config()
     except (OSError, ValueError) as exc:
         raise HTTPException(status_code=500, detail=f"读取配置失败: {exc}") from exc
-    return {"config": public_config(config), "status": read_status()}
+    return {
+        "config": public_config(config),
+        "status": read_status(),
+        "history": read_history(),
+        "scheduler": read_scheduler_status(),
+    }
 
 
 @app.get("/api/log")
@@ -108,10 +117,12 @@ async def update_config(request: Request, _: None = Depends(require_auth)):
 def run(_: None = Depends(require_auth)):
     if read_status().get("running"):
         raise HTTPException(status_code=409, detail="已有任务正在运行")
+    environment = os.environ.copy()
+    environment["DOUYIN_TRIGGER"] = "manual"
     process = subprocess.Popen(
         [sys.executable, "-m", "webapp.task_runner"],
         cwd=PROJECT_ROOT,
-        env=os.environ.copy(),
+        env=environment,
         start_new_session=True,
     )
     return JSONResponse({"accepted": True, "pid": process.pid})

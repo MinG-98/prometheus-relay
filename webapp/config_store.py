@@ -14,6 +14,8 @@ CONFIG_PATH = DATA_DIR / "config.json"
 STATUS_PATH = DATA_DIR / "status.json"
 LOG_PATH = DATA_DIR / "task.log"
 LOCK_PATH = DATA_DIR / "task.lock"
+HISTORY_PATH = DATA_DIR / "history.json"
+SCHEDULER_STATUS_PATH = DATA_DIR / "schedule-status.json"
 
 SUPPORTED_LOG_LEVELS = {"Debug", "Info", "Warning", "Error"}
 DEFAULT_CONFIG = {
@@ -44,7 +46,7 @@ def ensure_data_dir() -> None:
         pass
 
 
-def _atomic_write_json(path: Path, value: dict) -> None:
+def _atomic_write_json(path: Path, value: object) -> None:
     ensure_data_dir()
     with tempfile.NamedTemporaryFile(
         mode="w",
@@ -94,6 +96,45 @@ def read_status() -> dict:
 
 def write_status(status: dict) -> None:
     _atomic_write_json(STATUS_PATH, status)
+
+
+def read_history(max_items: int = 20) -> list[dict]:
+    ensure_data_dir()
+    if not HISTORY_PATH.exists():
+        return []
+    try:
+        with HISTORY_PATH.open("r", encoding="utf-8") as handle:
+            history = json.load(handle)
+        if not isinstance(history, list):
+            return []
+        clean_history = [item for item in history if isinstance(item, dict)]
+        limit = max(1, min(int(max_items), 100))
+        return clean_history[-limit:]
+    except (OSError, json.JSONDecodeError):
+        return []
+
+
+def append_history(entry: dict, max_items: int = 50) -> None:
+    limit = max(1, min(int(max_items), 100))
+    history = read_history(max_items=limit)
+    history.append(dict(entry))
+    _atomic_write_json(HISTORY_PATH, history[-limit:])
+
+
+def read_scheduler_status() -> dict:
+    ensure_data_dir()
+    if not SCHEDULER_STATUS_PATH.exists():
+        return {"heartbeatAt": None, "enabled": False}
+    try:
+        with SCHEDULER_STATUS_PATH.open("r", encoding="utf-8") as handle:
+            status = json.load(handle)
+        return status if isinstance(status, dict) else {"heartbeatAt": None, "enabled": False}
+    except (OSError, json.JSONDecodeError):
+        return {"heartbeatAt": None, "enabled": False}
+
+
+def write_scheduler_status(status: dict) -> None:
+    _atomic_write_json(SCHEDULER_STATUS_PATH, status)
 
 
 def read_log(max_lines: int = 200) -> str:

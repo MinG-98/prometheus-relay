@@ -11,6 +11,7 @@ from pathlib import Path
 from webapp.config_store import (
     LOCK_PATH,
     LOG_PATH,
+    append_history,
     read_status,
     load_config,
     ensure_data_dir,
@@ -62,7 +63,7 @@ def _task_environment(config: dict) -> dict:
     return environment
 
 
-def run_once() -> int:
+def run_once(trigger: str | None = None) -> int:
     ensure_data_dir()
     lock_handle = LOCK_PATH.open("a+", encoding="utf-8")
     os.chmod(LOCK_PATH, 0o600)
@@ -76,9 +77,20 @@ def run_once() -> int:
     if existing_status.get("running"):
         return 2
 
+    trigger = (trigger or os.getenv("DOUYIN_TRIGGER", "system")).strip().lower()
+    if trigger not in {"manual", "schedule", "system"}:
+        trigger = "system"
+    account_count = len(config.get("accounts", []))
+    target_count = sum(len(account.get("targets", [])) for account in config.get("accounts", []))
     started_at = _now()
+    status_base = {
+        "trigger": trigger,
+        "accountCount": account_count,
+        "targetCount": target_count,
+    }
     write_status(
         {
+            **status_base,
             "running": True,
             "startedAt": started_at,
             "finishedAt": None,
@@ -88,39 +100,54 @@ def run_once() -> int:
     )
 
     LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with LOG_PATH.open("a", encoding="utf-8") as log_handle:
-        log_handle.write(f"\n=== task started {started_at} ===\n")
-        log_handle.flush()
-        process = subprocess.Popen(
-            [sys.executable, "main.py"],
-            cwd=PROJECT_ROOT,
-            env=_task_environment(config),
-            stdout=log_handle,
-            stderr=subprocess.STDOUT,
-            text=True,
-        )
-        write_status(
-            {
-                "running": True,
-                "startedAt": started_at,
-                "finishedAt": None,
-                "exitCode": None,
-                "pid": process.pid,
-            }
-        )
-        exit_code = process.wait()
+    exit_code = 1
+    finished_at = None
+    try:
+        with LOG_PATH.open("a", encoding="utf-8") as log_handle:
+            log_handle.write(f"\n=== task started {started_at}, trigger={trigger} ===\n")
+            log_handle.flush()
+            process = subprocess.Popen(
+                [sys.executable, "main.py"],
+                cwd=PROJECT_ROOT,
+                env=_task_environment(config),
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            write_status(
+                {
+                    **status_base,
+                    "running": True,
+                    "startedAt": started_at,
+                    "finishedAt": None,
+                    "exitCode": None,
+                    "pid": process.pid,
+                }
+            )
+            exit_code = process.wait()
+            finished_at = _now()
+            log_handle.write(f"=== task finished {finished_at}, exit={exit_code} ===\n")
+    except Exception as exc:
         finished_at = _now()
-        log_handle.write(f"=== task finished {finished_at}, exit={exit_code} ===\n")
+        try:
+            with LOG_PATH.open("a", encoding="utf-8") as log_handle:
+                log_handle.write(f"=== task failed {finished_at}: {type(exc).__name__}: {exc} ===\n")
+        except OSError:
+            pass
 
-    write_status(
-        {
-            "running": False,
-            "startedAt": started_at,
-            "finishedAt": finished_at,
-            "exitCode": exit_code,
-            "pid": None,
-        }
-    )
+    final_status = {
+        **status_base,
+        "running": False,
+        "startedAt": started_at,
+        "finishedAt": finished_at or _now(),
+        "exitCode": exit_code,
+        "pid": None,
+    }
+    write_status(final_status)
+    try:
+        append_history(final_status)
+    except OSError:
+        pass
     return exit_code
 
 
