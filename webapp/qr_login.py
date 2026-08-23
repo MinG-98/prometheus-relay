@@ -28,8 +28,8 @@ AUTH_COOKIE_NAMES = frozenset(
     }
 )
 TERMINAL_STATES = frozenset({"complete", "expired", "cancelled", "error"})
-QR_SESSION_SECONDS = 300
-DETAILS_SESSION_SECONDS = 300
+QR_SESSION_SECONDS = 600
+DETAILS_SESSION_SECONDS = 600
 MAX_QR_IMAGE_BYTES = 512 * 1024
 MAX_COOKIE_TOTAL_BYTES = 1024 * 1024
 
@@ -324,6 +324,44 @@ class QRLoginManager:
                 session.detected_unique_id = unique_id
                 session.detected_username = username
 
+    def _probe_profile(self, session: _QRSession, page) -> None:
+        """Ask the same browser session whether the QR login is now authenticated."""
+        try:
+            result = page.evaluate(
+                """
+                async () => {
+                    try {
+                        const response = await fetch('/aweme/v1/creator/user/info/', {
+                            credentials: 'include',
+                            cache: 'no-store',
+                        });
+                        return {status: response.status, payload: await response.json()};
+                    } catch (_error) {
+                        return null;
+                    }
+                }
+                """
+            )
+        except Exception:
+            return
+        if not isinstance(result, dict) or result.get("status") != 200:
+            return
+        try:
+            unique_id, username = extract_profile(
+                "/aweme/v1/creator/user/info/", result.get("payload")
+            )
+        except Exception:
+            return
+        if not unique_id or not username:
+            return
+        with self._lock:
+            if self._session is session:
+                session.detected_unique_id = unique_id
+                session.detected_username = username
+                if session.status == "waiting_scan":
+                    session.status = "scanned"
+                    session.message = "已检测到登录确认，正在保存账号…"
+
     def _is_logged_in(self, session: _QRSession, page, context) -> bool:
         path = urlsplit(page.url).path
         cookie_names = {cookie.get("name", "") for cookie in context.cookies()}
@@ -475,6 +513,7 @@ class QRLoginManager:
                 page.goto(CREATOR_URL, wait_until="domcontentloaded", timeout=120_000)
 
                 last_qr_capture = 0.0
+                last_profile_probe = 0.0
                 while not session.cancel_event.is_set():
                     with self._lock:
                         if self._session is not session or session.status in TERMINAL_STATES:
@@ -488,6 +527,22 @@ class QRLoginManager:
                         self._capture_qr(session, page)
                         self._detect_scan_state(session, page)
                         last_qr_capture = now
+                    if now - last_profile_probe >= 4:
+                        self._probe_profile(session, page)
+                        last_profile_probe = now
+                    with self._lock:
+                        profile_ready = bool(
+                            session.detected_unique_id and session.detected_username
+                        )
+                        cookie_names = {
+                            cookie.get("name", "") for cookie in context.cookies()
+                        }
+                        auth_cookie_ready = bool(
+                            AUTH_COOKIE_NAMES.intersection(cookie_names)
+                        )
+                    if profile_ready and auth_cookie_ready:
+                        self._complete_login(session, page, context)
+                        return
                     if self._is_logged_in(session, page, context):
                         self._complete_login(session, page, context)
                         return
