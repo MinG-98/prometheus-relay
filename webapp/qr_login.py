@@ -59,6 +59,8 @@ class _QRSession:
     pending_cookies: list[dict] | None = None
     account: dict | None = None
     created: bool | None = None
+    auth_seen_at: float = 0.0
+    last_home_probe_at: float = 0.0
 
 
 def _nested_value(payload: object, *path: str) -> object:
@@ -322,13 +324,38 @@ class QRLoginManager:
                 session.detected_unique_id = unique_id
                 session.detected_username = username
 
-    def _is_logged_in(self, page, context) -> bool:
+    def _is_logged_in(self, session: _QRSession, page, context) -> bool:
         path = urlsplit(page.url).path
         cookie_names = {cookie.get("name", "") for cookie in context.cookies()}
-        if not AUTH_COOKIE_NAMES.intersection(cookie_names):
+        has_auth_cookie = bool(AUTH_COOKIE_NAMES.intersection(cookie_names))
+        if not has_auth_cookie:
+            with self._lock:
+                session.auth_seen_at = 0.0
             return False
+
+        now = time.monotonic()
+        with self._lock:
+            if self._session is not session:
+                return False
+            if not session.auth_seen_at:
+                session.auth_seen_at = now
+                if session.status == "waiting_scan":
+                    session.status = "scanned"
+                    session.message = "已检测到登录确认，正在打开创作者中心…"
+            auth_seen_for = now - session.auth_seen_at
+
         if path.startswith("/creator-micro/"):
             return True
+
+        # Douyin can set the session cookie shortly before the phone-side
+        # confirmation finishes. Give that transition time to settle instead
+        # of navigating away from the QR confirmation page immediately.
+        if auth_seen_for < 5:
+            return False
+        with self._lock:
+            if now - session.last_home_probe_at < 5:
+                return False
+            session.last_home_probe_at = now
         try:
             page.goto(CREATOR_HOME_URL, wait_until="domcontentloaded", timeout=30_000)
         except Exception:
@@ -364,6 +391,9 @@ class QRLoginManager:
                 session.message = "请使用抖音 App 扫码，并在手机上确认登录"
 
     def _detect_scan_state(self, session: _QRSession, page) -> None:
+        if urlsplit(page.url).path.startswith("/creator-micro/"):
+            self._set_state(session, "scanned", "已扫码，正在确认登录状态…")
+            return
         try:
             text = page.locator("#animate_qrcode_container").inner_text(timeout=1_000)
         except Exception:
@@ -376,7 +406,7 @@ class QRLoginManager:
 
     def _wait_for_profile(self, session: _QRSession, page) -> tuple[str, str]:
         deadline = time.monotonic() + 20
-        navigated_home = urlsplit(page.url).path == "/creator-micro/home"
+        navigated_home = urlsplit(page.url).path.startswith("/creator-micro/")
         while time.monotonic() < deadline and not session.cancel_event.is_set():
             with self._lock:
                 unique_id = session.detected_unique_id
@@ -453,15 +483,14 @@ class QRLoginManager:
                             self._expire_locked(time.time())
                             return
 
-                    if self._is_logged_in(page, context):
-                        self._complete_login(session, page, context)
-                        return
-
                     now = time.monotonic()
                     if now - last_qr_capture >= 2:
                         self._capture_qr(session, page)
                         self._detect_scan_state(session, page)
                         last_qr_capture = now
+                    if self._is_logged_in(session, page, context):
+                        self._complete_login(session, page, context)
+                        return
                     session.cancel_event.wait(0.5)
         except Exception:
             with self._lock:
