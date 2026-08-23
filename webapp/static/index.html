@@ -295,12 +295,25 @@
           <li><span>1</span><p>打开抖音 App，点击左上角菜单。</p></li>
           <li><span>2</span><p>选择“扫一扫”，扫描左侧二维码。</p></li>
           <li><span>3</span><p>在手机上确认登录，账号会自动保存。</p></li>
+          <li><span>4</span><p>若抖音要求短信安全验证，请按手机提示完成；本页会自动继续。</p></li>
         </ol>
         <div class="qr-security-note">
           <strong>登录凭证不会显示在网页中</strong>
           <span>成功后仅写入 VPS 的私有数据卷，不写日志、不上传 GitHub。</span>
         </div>
       </div>
+    </div>
+
+    <div id="qrVerification" class="qr-verification" hidden>
+      <div>
+        <h3 id="qrVerificationTitle">正在准备短信验证</h3>
+        <p id="qrVerificationHelp">VPS 正在抖音官方安全验证页面中选择短信验证码方式。</p>
+      </div>
+      <div id="qrVerificationEntry" class="qr-verification-entry" hidden>
+        <input id="qrVerificationCode" type="text" inputmode="numeric" pattern="[0-9]*" minlength="4" maxlength="8" autocomplete="one-time-code" aria-label="短信验证码" placeholder="4–8 位验证码">
+        <button id="qrVerify" class="button primary" type="button">提交验证码</button>
+      </div>
+      <small>验证码仅在服务器内存中短暂存在，提交后立即清除，不写入配置和日志。</small>
     </div>
 
     <div id="qrDetails" class="qr-details" hidden>

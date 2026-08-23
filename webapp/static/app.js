@@ -32,6 +32,7 @@
   let qrImageRevision = 0;
   let qrImageObjectUrl = "";
   let qrState = "";
+  let qrVerificationReady = false;
   let qrCompletionHandled = false;
 
   function escapeHtml(value) {
@@ -622,6 +623,7 @@
     const addButton = $("addAccount");
     const scanButton = $("scanAccount");
     const qrProbe = $("qrProbe");
+    const qrVerify = $("qrVerify");
     const saveState = document.querySelector(".save-state");
     const qrOpen = Boolean($("qrDialog")?.open);
 
@@ -631,17 +633,27 @@
     scanButton.disabled = dirty || running || Boolean(busyAction) || counts.accounts >= 20 || pendingCookie || qrOpen;
     qrProbe.disabled = Boolean(busyAction)
       || !qrOpen
-      || !["waiting_scan", "scanned"].includes(qrState);
+      || !["waiting_scan", "scanned", "verification_required"].includes(qrState);
+    qrVerify.disabled = Boolean(busyAction)
+      || !qrOpen
+      || qrState !== "verification_required"
+      || !qrVerificationReady;
 
     saveButton.classList.toggle("loading", busyAction === "save");
     runButton.classList.toggle("loading", busyAction === "run");
     $("refresh").classList.toggle("loading", busyAction === "refresh");
     scanButton.classList.toggle("loading", busyAction === "qr");
     qrProbe.classList.toggle("loading", busyAction === "probe");
+    qrVerify.classList.toggle("loading", busyAction === "verify");
     scanButton.innerHTML = busyAction === "qr"
       ? "正在启动…"
       : '<span aria-hidden="true">▦</span>扫码添加';
-    qrProbe.textContent = busyAction === "probe" ? "正在检查…" : "我已在手机确认登录";
+    qrProbe.textContent = busyAction === "probe"
+      ? "正在检查…"
+      : qrState === "verification_required"
+        ? "重新检查登录状态"
+        : "我已在手机确认登录";
+    qrVerify.textContent = busyAction === "verify" ? "提交中…" : "提交验证码";
     saveButton.textContent = busyAction === "save" ? "保存中…" : "保存更改";
     runButton.textContent = busyAction === "run" ? "启动中…" : running ? "任务运行中" : "立即运行";
 
@@ -922,6 +934,8 @@
       placeholder.innerHTML = '<span class="qr-spinner" aria-hidden="true"></span><span></span>';
     } else if (type === "success") {
       placeholder.innerHTML = '<span class="qr-success-mark" aria-hidden="true">✓</span><span></span>';
+    } else if (type === "verification") {
+      placeholder.innerHTML = '<span class="qr-verification-mark" aria-hidden="true">✉</span><span></span>';
     } else {
       placeholder.innerHTML = '<span class="qr-success-mark" aria-hidden="true">!</span><span></span>';
     }
@@ -932,7 +946,17 @@
     stopQrPolling();
     releaseQrImage();
     qrState = "starting";
+    qrVerificationReady = false;
     qrCompletionHandled = false;
+    $("qrVerification").hidden = true;
+    $("qrVerificationEntry").hidden = true;
+    $("qrVerificationTitle").textContent = "正在准备短信验证";
+    $("qrVerificationHelp").textContent = "VPS 正在抖音官方安全验证页面中选择短信验证码方式。";
+    $("qrVerificationCode").value = "";
+    $("qrVerificationCode").classList.remove("invalid");
+    $("qrVerificationCode").disabled = false;
+    $("qrVerify").disabled = false;
+    $("qrVerify").textContent = "提交验证码";
     $("qrDetails").hidden = true;
     $("qrUniqueId").value = "";
     $("qrUsername").value = "";
@@ -981,6 +1005,8 @@
       starting: "正在生成二维码",
       waiting_scan: "等待扫码",
       scanned: "已扫码，等待确认",
+      verification_required: "需要完成安全验证",
+      verifying: "正在提交短信验证码",
       saving: "正在识别账号",
       needs_details: "登录成功，请补充资料",
       complete: "账号配置完成",
@@ -1001,11 +1027,37 @@
 
     const isError = ["expired", "cancelled", "error"].includes(qrState);
     const isComplete = qrState === "complete";
+    const isVerification = ["verification_required", "verifying"].includes(qrState);
+    qrVerificationReady = Boolean(status.verificationInputReady)
+      && qrState === "verification_required";
     $("qrStatusDot").className = `qr-status-dot${isError ? " error" : isComplete ? " success" : ""}`;
     $("qrRestart").hidden = !isError;
-    $("qrProbe").hidden = !["waiting_scan", "scanned"].includes(qrState);
+    $("qrProbe").hidden = !["waiting_scan", "scanned", "verification_required"].includes(qrState);
     $("qrProbe").disabled = Boolean(busyAction);
-    $("qrProbe").textContent = busyAction === "probe" ? "正在检查…" : "我已在手机确认登录";
+    $("qrProbe").textContent = busyAction === "probe"
+      ? "正在检查…"
+      : qrState === "verification_required"
+        ? "重新检查登录状态"
+        : "我已在手机确认登录";
+    $("qrVerification").hidden = !isVerification;
+    $("qrVerification").classList.toggle("waiting", isVerification && !qrVerificationReady);
+    $("qrVerificationEntry").hidden = !qrVerificationReady;
+    if (!isVerification) $("qrVerificationCode").value = "";
+    $("qrVerificationCode").disabled = qrState === "verifying" || busyAction === "verify";
+    $("qrVerify").disabled = !qrVerificationReady || Boolean(busyAction);
+    $("qrVerify").textContent = busyAction === "verify" ? "提交中…" : "提交验证码";
+    if (qrState === "verifying") {
+      $("qrVerificationTitle").textContent = "正在提交短信验证码";
+      $("qrVerificationHelp").textContent = "VPS 已收到验证码，正在抖音官方安全验证页面中填写并提交。";
+    } else if (qrVerificationReady) {
+      $("qrVerificationTitle").textContent = "输入短信验证码";
+      $("qrVerificationHelp").textContent = "填写抖音发送的验证码，VPS 会提交到本次扫码使用的官方安全验证页面。";
+    } else {
+      $("qrVerificationTitle").textContent = "正在准备短信验证";
+      $("qrVerificationHelp").textContent = status.verificationStage === "choosing_method"
+        ? "VPS 正在抖音官方页面中选择“短信验证码”作为二次验证方式。"
+        : "短信方式已选择，正在等待抖音发送验证码并显示输入框。";
+    }
     $("qrConfirm").hidden = qrState !== "needs_details";
     $("qrDetails").hidden = qrState !== "needs_details";
     $("qrCancel").textContent = isComplete ? "完成" : "取消";
@@ -1016,6 +1068,15 @@
       showQrPlaceholder("正在生成二维码…");
     } else if (qrState === "saving") {
       showQrPlaceholder("手机已确认，正在安全保存账号…", "success");
+    } else if (qrState === "verification_required") {
+      showQrPlaceholder(
+        qrVerificationReady
+          ? "请输入抖音发送的短信验证码"
+          : "VPS 正在选择短信验证方式…",
+        "verification",
+      );
+    } else if (qrState === "verifying") {
+      showQrPlaceholder("验证码已交给 VPS，正在提交…", "verification");
     } else if (qrState === "needs_details") {
       showQrPlaceholder("登录凭证已取得", "success");
       if (!$("qrUniqueId").value && status.detected?.unique_id) {
@@ -1125,7 +1186,7 @@
     if (
       busyAction
       || !$("qrDialog").open
-      || !["waiting_scan", "scanned"].includes(qrState)
+      || !["waiting_scan", "scanned", "verification_required"].includes(qrState)
     ) return;
 
     busyAction = "probe";
@@ -1134,12 +1195,49 @@
       const response = await api("api/qr-login/probe", { method: "POST" });
       if (!response.ok) throw new Error(await responseError(response));
       await renderQrStatus(await response.json());
-      if (["waiting_scan", "scanned"].includes(qrState)) {
-        showToast("已通知 VPS 检查登录状态，请稍候", "success");
+      if (["waiting_scan", "scanned", "verification_required"].includes(qrState)) {
+        showToast(
+          qrState === "verification_required"
+            ? "正在检查短信验证结果，请保持此窗口打开"
+            : "已通知 VPS 检查登录状态，请稍候",
+          "success",
+        );
       }
     } catch (error) {
       $("qrMessage").textContent = error.message || "暂时无法检查登录状态";
       showToast(error.message || "暂时无法检查登录状态", "error");
+    } finally {
+      busyAction = null;
+      updateActionState();
+    }
+  }
+
+  async function submitQrVerificationCode() {
+    if (busyAction || qrState !== "verification_required" || !qrVerificationReady) return;
+    const input = $("qrVerificationCode");
+    const code = input.value.trim();
+    if (!/^\d{4,8}$/.test(code)) {
+      input.classList.add("invalid");
+      input.focus();
+      showToast("请输入 4 到 8 位数字短信验证码", "error");
+      return;
+    }
+
+    busyAction = "verify";
+    updateActionState();
+    try {
+      const response = await api("api/qr-login/verify", {
+        method: "POST",
+        body: JSON.stringify({ code }),
+      });
+      input.value = "";
+      if (!response.ok) throw new Error(await responseError(response));
+      await renderQrStatus(await response.json());
+      showToast("验证码已交给 VPS 提交", "success");
+    } catch (error) {
+      input.value = "";
+      $("qrMessage").textContent = error.message || "验证码暂时无法提交";
+      showToast(error.message || "验证码暂时无法提交", "error");
     } finally {
       busyAction = null;
       updateActionState();
@@ -1184,7 +1282,7 @@
   async function closeQrDialog({ cancelSession = true } = {}) {
     const dialog = $("qrDialog");
     stopQrPolling();
-    if (cancelSession && ["starting", "waiting_scan", "scanned", "saving", "needs_details"].includes(qrState)) {
+    if (cancelSession && ["starting", "waiting_scan", "scanned", "verification_required", "verifying", "saving", "needs_details"].includes(qrState)) {
       try {
         await api("api/qr-login/cancel", { method: "POST" });
       } catch (_error) {
@@ -1393,6 +1491,12 @@
     $("addAccount").addEventListener("click", addAccount);
     $("qrRestart").addEventListener("click", restartQrLogin);
     $("qrProbe").addEventListener("click", probeQrLogin);
+    $("qrVerify").addEventListener("click", submitQrVerificationCode);
+    $("qrVerificationCode").addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      submitQrVerificationCode();
+    });
     $("qrConfirm").addEventListener("click", confirmQrDetails);
     $("qrClose").addEventListener("click", () => closeQrDialog());
     $("qrCancel").addEventListener("click", () => closeQrDialog({

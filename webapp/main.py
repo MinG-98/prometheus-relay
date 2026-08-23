@@ -245,6 +245,19 @@ def probe_qr_login(_: None = Depends(require_mutation_auth)):
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
+@app.post("/api/qr-login/verify", status_code=202)
+async def verify_qr_login(
+    request: Request, _: None = Depends(require_mutation_auth)
+):
+    payload = await read_json_body(request)
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="短信验证码必须是 JSON 对象")
+    try:
+        return qr_login_manager.submit_verification_code(payload.get("code"))
+    except QRLoginStateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @app.post("/api/qr-login/confirm")
 async def confirm_qr_login(
     request: Request, _: None = Depends(require_mutation_auth)

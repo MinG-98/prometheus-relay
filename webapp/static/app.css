@@ -1332,6 +1332,17 @@ pre {
   font-size: 27px;
 }
 
+.qr-verification-mark {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--warning-soft);
+  color: #8b5d08;
+  font-size: 25px;
+}
+
 .qr-status-row {
   display: grid;
   grid-template-columns: 10px minmax(0, 1fr);
@@ -1448,6 +1459,64 @@ pre {
   margin-top: 3px;
   color: var(--text-faint);
   font-size: 10px;
+}
+
+.qr-verification {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(250px, 0.8fr);
+  gap: 14px 20px;
+  align-items: end;
+  margin-top: 22px;
+  padding: 18px;
+  border: 1px solid #ead49a;
+  border-radius: 14px;
+  background: var(--warning-soft);
+}
+
+.qr-verification[hidden] {
+  display: none;
+}
+
+.qr-verification.waiting {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.qr-verification h3,
+.qr-verification p {
+  margin: 0;
+}
+
+.qr-verification h3 {
+  font-size: 14px;
+}
+
+.qr-verification p,
+.qr-verification small {
+  color: var(--text-soft);
+  font-size: 11px;
+}
+
+.qr-verification p {
+  margin-top: 5px;
+}
+
+.qr-verification small {
+  grid-column: 1 / -1;
+}
+
+.qr-verification-entry {
+  display: flex;
+  gap: 9px;
+}
+
+.qr-verification-entry input {
+  min-width: 0;
+  letter-spacing: 0.18em;
+  text-align: center;
+}
+
+.qr-verification-entry .button {
+  flex: 0 0 auto;
 }
 
 .qr-details {
@@ -1647,6 +1716,14 @@ noscript {
 
   .qr-guide {
     padding: 17px;
+  }
+
+  .qr-verification {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .qr-verification-entry {
+    flex-direction: column;
   }
 
   .qr-dialog-actions {
