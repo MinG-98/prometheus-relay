@@ -31,9 +31,11 @@
 
 ## 项目概览
 
-Prometheus Relay 使用 **Playwright + Chromium** 驱动抖音创作者中心，通过接近正常人工操作的方式向指定好友发送续火花消息。项目提供完整的 VPS 网页控制台，让扫码登录、账号、目标好友、消息模板、运行计划和执行记录都能在一个页面中完成管理。
+Prometheus Relay 是一个面向个人自托管的抖音火花自动维护控制台（**Self-hosted Douyin streak automation console**）。它使用 VPS 上的 **Playwright + Chromium** 驱动抖音创作者中心，通过接近正常人工操作的方式向指定好友发送续火花消息。
 
-它适合希望把任务放在自己的服务器上长期运行，同时又不想手动维护环境变量、Cron 和浏览器脚本的个人用户。
+项目把二维码登录、短信二次验证、Cookie 会话管理、账号与目标好友、消息模板、定时任务和运行记录整合到一个简洁的网页控制台中。你可以将它部署在自己的 VPS 上，通过 Docker Compose 长期运行，并在需要时从网页完成登录、配置、手动运行和状态检查。
+
+它适合希望把任务放在自己的服务器上长期运行，同时又不想手动维护环境变量、Cron 和浏览器脚本的个人用户。项目不依赖第三方托管任务平台，登录会话和运行数据保存在自有服务器的私有持久化卷中。
 
 <p align="center">
   <img src="docs/images/dashboard-preview.png" alt="Prometheus Relay dashboard preview" width="100%">
