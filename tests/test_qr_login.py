@@ -1,10 +1,12 @@
 import unittest
+from unittest.mock import Mock
 
 from webapp.qr_login import (
     QRLoginManager,
     QRLoginStateError,
     _QRSession,
     extract_profile,
+    extract_qr_connect_status,
     sanitise_browser_cookies,
 )
 
@@ -32,6 +34,50 @@ class QRLoginTests(unittest.TestCase):
 
         self.assertEqual(unique_id, "123456")
         self.assertEqual(username, "备用账号")
+
+    def test_extracts_profile_from_creator_pc_user_info(self):
+        unique_id, username = extract_profile(
+            "/aweme/v1/creator/pc/user/info/",
+            {"user": {"unique_id": "pc_owner", "nickname": "PC账号"}},
+        )
+
+        self.assertEqual(unique_id, "pc_owner")
+        self.assertEqual(username, "PC账号")
+
+    def test_extracts_qr_connect_status(self):
+        self.assertEqual(
+            extract_qr_connect_status(
+                "/passport/web/check_qrconnect/",
+                {"data": {"status": "confirmed"}},
+            ),
+            "confirmed",
+        )
+        self.assertEqual(
+            extract_qr_connect_status(
+                "/aweme/v1/creator/user/info/",
+                {"data": {"status": "confirmed"}},
+            ),
+            "",
+        )
+
+    def test_qr_connect_response_marks_session_as_scanned(self):
+        manager = QRLoginManager()
+        session = _QRSession(
+            nonce="test",
+            status="waiting_scan",
+            message="等待扫码",
+            started_at=0,
+            expires_at=9999999999,
+        )
+        manager._session = session
+        response = Mock()
+        response.url = "https://creator.douyin.com/passport/web/check_qrconnect/"
+        response.json.return_value = {"data": {"status": "confirmed"}}
+
+        manager._capture_qr_connect_response(session, response)
+
+        self.assertEqual(session.status, "scanned")
+        self.assertIn("手机确认", session.message)
 
     def test_browser_cookies_are_limited_to_douyin_without_export_metadata(self):
         cookies = sanitise_browser_cookies(

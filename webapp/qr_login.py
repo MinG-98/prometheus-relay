@@ -32,6 +32,11 @@ QR_SESSION_SECONDS = 600
 DETAILS_SESSION_SECONDS = 600
 MAX_QR_IMAGE_BYTES = 512 * 1024
 MAX_COOKIE_TOTAL_BYTES = 1024 * 1024
+PROFILE_PATHS = (
+    "/aweme/v1/creator/user/info/",
+    "/aweme/v1/creator/pc/user/info/",
+    "/web/api/media/user/info/",
+)
 
 
 class QRLoginBusyError(RuntimeError):
@@ -79,7 +84,9 @@ def extract_profile(response_path: str, payload: object) -> tuple[str, str]:
         return "", ""
 
     candidates: list[tuple[object, object]] = []
-    if response_path.endswith("/aweme/v1/creator/user/info/"):
+    if response_path.endswith(
+        ("/aweme/v1/creator/user/info/", "/aweme/v1/creator/pc/user/info/")
+    ):
         candidates.extend(
             [
                 (
@@ -89,6 +96,18 @@ def extract_profile(response_path: str, payload: object) -> tuple[str, str]:
                 (
                     _nested_value(payload, "user_profile", "unique_id"),
                     _nested_value(payload, "user_profile", "nick_name"),
+                ),
+                (
+                    _nested_value(payload, "user_profile", "unique_id"),
+                    _nested_value(payload, "user_profile", "nickname"),
+                ),
+                (
+                    _nested_value(payload, "user", "unique_id"),
+                    _nested_value(payload, "user", "nickname"),
+                ),
+                (
+                    _nested_value(payload, "user_info", "unique_id"),
+                    _nested_value(payload, "user_info", "nickname"),
                 ),
             ]
         )
@@ -106,6 +125,18 @@ def extract_profile(response_path: str, payload: object) -> tuple[str, str]:
         if re.fullmatch(r"[A-Za-z0-9_-]{1,64}", unique_id) and username:
             return unique_id, username[:120]
     return "", ""
+
+
+def extract_qr_connect_status(response_path: str, payload: object) -> str:
+    """Extract the state returned by Douyin's QR-login polling endpoint."""
+    if not response_path.endswith("/passport/web/check_qrconnect/"):
+        return ""
+    if not isinstance(payload, dict):
+        return ""
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        return ""
+    return str(data.get("status") or "").strip().lower()
 
 
 def sanitise_browser_cookies(cookies: object) -> list[dict]:
@@ -330,6 +361,7 @@ class QRLoginManager:
         path = urlsplit(response.url).path
         if not (
             path.endswith("/aweme/v1/creator/user/info/")
+            or path.endswith("/aweme/v1/creator/pc/user/info/")
             or path.endswith("/web/api/media/user/info/")
         ):
             return
@@ -344,34 +376,78 @@ class QRLoginManager:
                 session.detected_unique_id = unique_id
                 session.detected_username = username
 
+    def _capture_qr_connect_response(self, session: _QRSession, response: Response) -> None:
+        path = urlsplit(response.url).path
+        if not path.endswith("/passport/web/check_qrconnect/"):
+            return
+        try:
+            status = extract_qr_connect_status(path, response.json())
+        except Exception:
+            return
+        if not status or status in {"new", "waiting", "wait"}:
+            return
+        if status in {"expired", "invalid", "timeout", "closed", "cancelled"}:
+            self._set_state(session, "expired", "二维码已过期，请重新生成")
+            session.cancel_event.set()
+            return
+        if status in {"scanned", "scaned", "scan"}:
+            message = "已检测到手机扫码，等待确认登录…"
+        elif status in {
+            "confirmed",
+            "confirm",
+            "success",
+            "logged_in",
+            "authorized",
+        }:
+            message = "已检测到手机确认，正在获取登录状态…"
+        else:
+            message = "已收到抖音扫码状态，正在获取登录状态…"
+        self._set_state(session, "scanned", message)
+
     def _probe_profile(self, session: _QRSession, page) -> None:
         """Ask the same browser session whether the QR login is now authenticated."""
         try:
             result = page.evaluate(
                 """
-                async () => {
-                    try {
-                        const response = await fetch('/aweme/v1/creator/user/info/', {
-                            credentials: 'include',
-                            cache: 'no-store',
-                        });
-                        return {status: response.status, payload: await response.json()};
-                    } catch (_error) {
-                        return null;
-                    }
+                async (paths) => {
+                    return Promise.all(paths.map(async (path) => {
+                        try {
+                            const response = await fetch(path, {
+                                credentials: 'include',
+                                cache: 'no-store',
+                            });
+                            let payload = null;
+                            try {
+                                payload = await response.json();
+                            } catch (_error) {
+                                // Some endpoints can return an empty body while logged out.
+                            }
+                            return {path, status: response.status, payload};
+                        } catch (_error) {
+                            return {path, status: 0, payload: null};
+                        }
+                    }));
                 }
-                """
+                """,
+                list(PROFILE_PATHS),
             )
         except Exception:
             return
-        if not isinstance(result, dict) or result.get("status") != 200:
+        if not isinstance(result, list):
             return
-        try:
-            unique_id, username = extract_profile(
-                "/aweme/v1/creator/user/info/", result.get("payload")
-            )
-        except Exception:
-            return
+        unique_id = ""
+        username = ""
+        for item in result:
+            if not isinstance(item, dict) or item.get("status") != 200:
+                continue
+            try:
+                unique_id, username = extract_profile(
+                    str(item.get("path") or ""), item.get("payload")
+                )
+            except Exception:
+                continue
+            if unique_id and username:
+                break
         if not unique_id or not username:
             return
         with self._lock:
@@ -529,6 +605,10 @@ class QRLoginManager:
                 page.on(
                     "response",
                     lambda response: self._capture_profile_response(session, response),
+                )
+                page.on(
+                    "response",
+                    lambda response: self._capture_qr_connect_response(session, response),
                 )
                 page.goto(CREATOR_URL, wait_until="domcontentloaded", timeout=120_000)
 
