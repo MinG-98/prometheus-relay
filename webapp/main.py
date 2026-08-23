@@ -237,6 +237,14 @@ def qr_login_image(_: None = Depends(require_auth)):
     )
 
 
+@app.post("/api/qr-login/probe", status_code=202)
+def probe_qr_login(_: None = Depends(require_mutation_auth)):
+    try:
+        return qr_login_manager.probe()
+    except QRLoginStateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @app.post("/api/qr-login/confirm")
 async def confirm_qr_login(
     request: Request, _: None = Depends(require_mutation_auth)

@@ -1,6 +1,12 @@
 import unittest
 
-from webapp.qr_login import extract_profile, sanitise_browser_cookies
+from webapp.qr_login import (
+    QRLoginManager,
+    QRLoginStateError,
+    _QRSession,
+    extract_profile,
+    sanitise_browser_cookies,
+)
 
 
 class QRLoginTests(unittest.TestCase):
@@ -64,6 +70,27 @@ class QRLoginTests(unittest.TestCase):
                     }
                 ]
             )
+
+    def test_probe_marks_active_session_and_wakes_browser(self):
+        manager = QRLoginManager()
+        session = _QRSession(
+            nonce="test",
+            status="waiting_scan",
+            message="等待扫码",
+            started_at=0,
+            expires_at=9999999999,
+        )
+        manager._session = session
+
+        result = manager.probe()
+
+        self.assertEqual(result["status"], "scanned")
+        self.assertTrue(session.probe_event.is_set())
+        self.assertIn("检查手机确认", result["message"])
+
+    def test_probe_requires_an_active_session(self):
+        with self.assertRaisesRegex(QRLoginStateError, "没有扫码登录会话"):
+            QRLoginManager().probe()
 
 
 if __name__ == "__main__":

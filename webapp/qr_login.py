@@ -50,6 +50,7 @@ class _QRSession:
     started_at: float
     expires_at: float
     cancel_event: threading.Event = field(default_factory=threading.Event)
+    probe_event: threading.Event = field(default_factory=threading.Event)
     thread: threading.Thread | None = None
     qr_png: bytes | None = None
     qr_digest: str = ""
@@ -219,6 +220,25 @@ class QRLoginManager:
             if session.status != "complete":
                 session.status = "cancelled"
                 session.message = "扫码登录已取消"
+            return self._public_status_locked(session, now)
+
+    def probe(self) -> dict:
+        """Immediately ask the browser worker to verify phone-side confirmation."""
+        now = time.time()
+        with self._lock:
+            session = self._session
+            if session is None:
+                raise QRLoginStateError("当前没有扫码登录会话")
+            self._expire_locked(now)
+            if session.status in TERMINAL_STATES:
+                raise QRLoginStateError("扫码会话已结束，请重新生成二维码")
+            if session.status == "needs_details":
+                return self._public_status_locked(session, now)
+
+            session.probe_event.set()
+            if session.status in {"starting", "waiting_scan"}:
+                session.status = "scanned"
+                session.message = "正在检查手机确认登录，请稍候…"
             return self._public_status_locked(session, now)
 
     def confirm(self, unique_id: object, username: object) -> dict:
@@ -523,11 +543,14 @@ class QRLoginManager:
                             return
 
                     now = time.monotonic()
+                    manual_probe = session.probe_event.is_set()
+                    if manual_probe:
+                        session.probe_event.clear()
                     if now - last_qr_capture >= 2:
                         self._capture_qr(session, page)
                         self._detect_scan_state(session, page)
                         last_qr_capture = now
-                    if now - last_profile_probe >= 4:
+                    if manual_probe or now - last_profile_probe >= 4:
                         self._probe_profile(session, page)
                         last_profile_probe = now
                     with self._lock:

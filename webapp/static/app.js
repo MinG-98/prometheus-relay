@@ -621,6 +621,7 @@
     const runButton = $("run");
     const addButton = $("addAccount");
     const scanButton = $("scanAccount");
+    const qrProbe = $("qrProbe");
     const saveState = document.querySelector(".save-state");
     const qrOpen = Boolean($("qrDialog")?.open);
 
@@ -628,14 +629,19 @@
     runButton.disabled = dirty || running || Boolean(busyAction) || counts.accounts === 0 || counts.targets === 0;
     addButton.disabled = running || Boolean(busyAction) || counts.accounts >= 20 || pendingCookie;
     scanButton.disabled = dirty || running || Boolean(busyAction) || counts.accounts >= 20 || pendingCookie || qrOpen;
+    qrProbe.disabled = Boolean(busyAction)
+      || !qrOpen
+      || !["waiting_scan", "scanned"].includes(qrState);
 
     saveButton.classList.toggle("loading", busyAction === "save");
     runButton.classList.toggle("loading", busyAction === "run");
     $("refresh").classList.toggle("loading", busyAction === "refresh");
     scanButton.classList.toggle("loading", busyAction === "qr");
+    qrProbe.classList.toggle("loading", busyAction === "probe");
     scanButton.innerHTML = busyAction === "qr"
       ? "正在启动…"
       : '<span aria-hidden="true">▦</span>扫码添加';
+    qrProbe.textContent = busyAction === "probe" ? "正在检查…" : "我已在手机确认登录";
     saveButton.textContent = busyAction === "save" ? "保存中…" : "保存更改";
     runButton.textContent = busyAction === "run" ? "启动中…" : running ? "任务运行中" : "立即运行";
 
@@ -933,6 +939,9 @@
     $("qrUniqueId").classList.remove("invalid");
     $("qrUsername").classList.remove("invalid");
     $("qrRestart").hidden = true;
+    $("qrProbe").hidden = true;
+    $("qrProbe").disabled = false;
+    $("qrProbe").textContent = "我已在手机确认登录";
     $("qrConfirm").hidden = true;
     $("qrConfirm").disabled = false;
     $("qrConfirm").textContent = "保存账号";
@@ -994,6 +1003,9 @@
     const isComplete = qrState === "complete";
     $("qrStatusDot").className = `qr-status-dot${isError ? " error" : isComplete ? " success" : ""}`;
     $("qrRestart").hidden = !isError;
+    $("qrProbe").hidden = !["waiting_scan", "scanned"].includes(qrState);
+    $("qrProbe").disabled = Boolean(busyAction);
+    $("qrProbe").textContent = busyAction === "probe" ? "正在检查…" : "我已在手机确认登录";
     $("qrConfirm").hidden = qrState !== "needs_details";
     $("qrDetails").hidden = qrState !== "needs_details";
     $("qrCancel").textContent = isComplete ? "完成" : "取消";
@@ -1107,6 +1119,31 @@
     await new Promise((resolve) => window.setTimeout(resolve, 700));
     $("qrRestart").disabled = false;
     await beginQrLogin();
+  }
+
+  async function probeQrLogin() {
+    if (
+      busyAction
+      || !$("qrDialog").open
+      || !["waiting_scan", "scanned"].includes(qrState)
+    ) return;
+
+    busyAction = "probe";
+    updateActionState();
+    try {
+      const response = await api("api/qr-login/probe", { method: "POST" });
+      if (!response.ok) throw new Error(await responseError(response));
+      await renderQrStatus(await response.json());
+      if (["waiting_scan", "scanned"].includes(qrState)) {
+        showToast("已通知 VPS 检查登录状态，请稍候", "success");
+      }
+    } catch (error) {
+      $("qrMessage").textContent = error.message || "暂时无法检查登录状态";
+      showToast(error.message || "暂时无法检查登录状态", "error");
+    } finally {
+      busyAction = null;
+      updateActionState();
+    }
   }
 
   async function confirmQrDetails() {
@@ -1355,6 +1392,7 @@
     $("scanAccount").addEventListener("click", beginQrLogin);
     $("addAccount").addEventListener("click", addAccount);
     $("qrRestart").addEventListener("click", restartQrLogin);
+    $("qrProbe").addEventListener("click", probeQrLogin);
     $("qrConfirm").addEventListener("click", confirmQrDetails);
     $("qrClose").addEventListener("click", () => closeQrDialog());
     $("qrCancel").addEventListener("click", () => closeQrDialog({
