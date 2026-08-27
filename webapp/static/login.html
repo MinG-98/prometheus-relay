@@ -8,7 +8,7 @@
   <title>登录 · Prometheus Relay</title>
   <link rel="icon" href="static/mark.svg?v=20260822-2" type="image/svg+xml">
   <link rel="stylesheet" href="static/app.css?v=20260822-2">
-  <link rel="stylesheet" href="static/login.css?v=20260827-4">
+  <link rel="stylesheet" href="static/login.css?v=20260827-5">
   <script src="static/login.js?v=20260827-1" defer></script>
 </head>
 <body class="login-page">
@@ -47,7 +47,11 @@
           <span class="field-hint">区分大小写</span>
         </div>
         <div class="input-shell">
-          <span class="field-symbol lock-symbol" aria-hidden="true"></span>
+          <svg class="field-symbol lock-symbol" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <rect x="4" y="8.5" width="12" height="8" rx="2" stroke="currentColor" stroke-width="1.5"></rect>
+            <path d="M6.5 8.5V6.75a3.5 3.5 0 0 1 7 0V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
+            <circle cx="10" cy="12.5" r="1" fill="currentColor"></circle>
+          </svg>
           <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="256" placeholder="输入密码">
           <button id="passwordToggle" class="password-toggle" type="button" aria-controls="password" aria-label="显示密码" aria-pressed="false">显示</button>
         </div>
