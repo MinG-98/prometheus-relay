@@ -2294,6 +2294,28 @@ noscript {
   .client-page .user-identity {
     display: none;
   }
+
+  .client-page .brand {
+    min-width: 0;
+  }
+
+  .client-page .brand > span,
+  .client-page .brand strong {
+    min-width: 0;
+  }
+
+  .client-page .brand strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .client-page .status-pill {
+    max-width: none;
+    overflow: visible;
+    flex: 0 0 auto;
+    text-overflow: clip;
+  }
 }
 
 @media (max-width: 390px) {
