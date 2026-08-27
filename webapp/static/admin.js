@@ -118,6 +118,33 @@
     </tr>`).join("");
   }
 
+  function setupAdminNavigation() {
+    const links = Array.from(document.querySelectorAll("[data-admin-nav]"));
+    const setActive = (sectionId) => {
+      links.forEach((link) => {
+        link.classList.toggle("is-active", link.getAttribute("href") === `#${sectionId}`);
+      });
+    };
+
+    links.forEach((link) => {
+      link.addEventListener("click", () => {
+        const target = document.getElementById(link.getAttribute("href")?.slice(1));
+        if (target instanceof HTMLDetailsElement) target.open = true;
+        if (target) setActive(target.id);
+      });
+    });
+
+    if ("IntersectionObserver" in window) {
+      const observer = new IntersectionObserver((entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((left, right) => right.intersectionRatio - left.intersectionRatio)[0];
+        if (visible) setActive(visible.target.id);
+      }, { rootMargin: "-18% 0px -68% 0px", threshold: [0, 0.25, 0.6] });
+      document.querySelectorAll(".admin-anchor-section").forEach((section) => observer.observe(section));
+    }
+  }
+
   async function loadAll() {
     const [sessionResponse, overviewResponse, usersResponse, accountsResponse, auditResponse] = await Promise.all([
       api("/api/auth/session"),
@@ -246,5 +273,6 @@
     window.location.assign("/login");
   });
 
+  setupAdminNavigation();
   loadAll().catch((error) => showNotice(error.message || "管理数据读取失败", "error"));
 })();
