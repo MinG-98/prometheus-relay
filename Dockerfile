@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/playwright/python:v1.58.0-noble
+FROM mcr.microsoft.com/playwright/python:v1.62.0-noble
 
 LABEL org.opencontainers.image.title="Prometheus Relay" \
       org.opencontainers.image.description="Self-hosted Douyin streak automation console" \
