@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f7fb">
+  <meta name="description" content="Prometheus Relay 管理后台">
+  <title>管理后台 · Prometheus Relay</title>
+  <link rel="icon" href="static/mark.svg?v=20260822-2" type="image/svg+xml">
+  <link rel="stylesheet" href="static/app.css?v=20260822-2">
+  <link rel="stylesheet" href="static/admin.css?v=20260826-1">
+  <script src="static/admin.js?v=20260826-1" defer></script>
+</head>
+<body class="admin-page">
+  <a class="skip-link" href="#adminMain">跳到主要内容</a>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand" aria-label="Prometheus Relay">
+        <img class="brand-mark" src="static/mark.svg?v=20260822-2" alt="">
+        <span><strong>Prometheus Relay</strong><small>管理后台</small></span>
+      </div>
+      <div class="admin-header-actions">
+        <span id="adminIdentity" class="user-label">管理员</span>
+        <button id="adminLogout" class="button ghost compact" type="button">退出登录</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="adminMain" class="page-shell admin-shell">
+    <section class="overview" aria-labelledby="adminTitle">
+      <div class="section-heading overview-heading">
+        <div>
+          <p class="eyebrow">Platform overview</p>
+          <h1 id="adminTitle">客户与运行管理</h1>
+          <p class="section-description">客户使用独立账号登录，只能管理自己的抖音配置。</p>
+        </div>
+        <button id="adminRefresh" class="button ghost compact" type="button">↻ 刷新</button>
+      </div>
+      <div class="metric-grid admin-metrics" aria-live="polite">
+        <article class="metric-card accent-blue"><span class="metric-label">客户</span><strong id="customerMetric" class="metric-value">—</strong><span id="customerMetricMeta" class="metric-meta">—</span></article>
+        <article class="metric-card accent-violet"><span class="metric-label">抖音账号</span><strong id="accountMetric" class="metric-value">—</strong><span class="metric-meta">所有工作区合计</span></article>
+        <article class="metric-card accent-cyan"><span class="metric-label">当前任务</span><strong id="runningMetric" class="metric-value">—</strong><span class="metric-meta">跨客户任务数</span></article>
+        <article class="metric-card accent-green"><span class="metric-label">最近结果</span><strong id="lastRunMetric" class="metric-value">—</strong><span id="lastRunMetricMeta" class="metric-meta">—</span></article>
+      </div>
+    </section>
+
+    <div id="adminNotice" class="admin-notice" role="status" hidden></div>
+
+    <div class="admin-grid">
+      <section class="panel customer-create-panel" aria-labelledby="createCustomerTitle">
+        <div class="section-heading compact-heading">
+          <div><p class="eyebrow">新建客户</p><h2 id="createCustomerTitle">创建登录账号</h2></div>
+        </div>
+        <form id="createCustomerForm" class="admin-form">
+          <div class="form-grid two-columns">
+            <div class="field"><label for="customerUsername">登录用户名</label><input id="customerUsername" type="text" maxlength="64" autocomplete="off" required placeholder="例如 customer01"></div>
+            <div class="field"><label for="customerDisplayName">显示名称</label><input id="customerDisplayName" type="text" maxlength="120" autocomplete="off" placeholder="例如 张三"></div>
+          </div>
+          <div class="field"><label for="customerPassword">初始密码（可留空自动生成）</label><input id="customerPassword" type="text" maxlength="256" autocomplete="off" placeholder="留空则生成一次性密码"></div>
+          <div class="form-grid two-columns">
+            <div class="field"><label for="customerMaxAccounts">账号上限</label><input id="customerMaxAccounts" type="number" min="1" max="20" value="3"></div>
+            <div class="field"><label for="customerMaxTargets">每账号好友上限</label><input id="customerMaxTargets" type="number" min="1" max="100" value="50"></div>
+          </div>
+          <button class="button primary" type="submit">创建客户</button>
+        </form>
+        <div id="credentialNotice" class="credential-notice" hidden></div>
+      </section>
+
+      <section class="panel admin-help-panel" aria-labelledby="adminHelpTitle">
+        <div class="section-heading compact-heading"><div><p class="eyebrow">操作原则</p><h2 id="adminHelpTitle">安全管理</h2></div></div>
+        <ul class="admin-help-list">
+          <li>客户登录后只能访问自己的工作区。</li>
+          <li>管理员可以禁用客户、重置密码和查看运行状态。</li>
+          <li>Cookie、短信验证码不会在管理页面显示。</li>
+          <li>删除客户会同时删除该客户的账号和任务记录。</li>
+        </ul>
+      </section>
+    </div>
+
+    <section class="panel admin-table-panel" aria-labelledby="customersTitle">
+      <div class="section-heading table-heading"><div><p class="eyebrow">Accounts</p><h2 id="customersTitle">客户列表</h2></div><span id="customerTableMeta" class="muted">正在读取…</span></div>
+      <div class="table-wrap"><table class="admin-table"><thead><tr><th>客户</th><th>状态</th><th>账号</th><th>最近登录</th><th>最近运行</th><th class="table-actions-heading">操作</th></tr></thead><tbody id="customerRows"><tr><td colspan="6" class="table-empty">正在读取客户…</td></tr></tbody></table></div>
+    </section>
+
+    <section class="panel admin-table-panel" aria-labelledby="accountsTitle">
+      <div class="section-heading table-heading"><div><p class="eyebrow">Douyin accounts</p><h2 id="accountsTitle">所有抖音账号</h2></div><span id="accountTableMeta" class="muted">正在读取…</span></div>
+      <div class="table-wrap"><table class="admin-table"><thead><tr><th>抖音账号</th><th>所属客户</th><th>目标好友</th><th>Cookie 状态</th><th>更新时间</th></tr></thead><tbody id="accountRows"><tr><td colspan="5" class="table-empty">正在读取账号…</td></tr></tbody></table></div>
+    </section>
+
+    <section class="panel admin-table-panel" aria-labelledby="auditTitle">
+      <div class="section-heading table-heading"><div><p class="eyebrow">Audit</p><h2 id="auditTitle">最近管理操作</h2></div></div>
+      <div class="table-wrap"><table class="admin-table"><thead><tr><th>时间</th><th>用户</th><th>操作</th><th>详情</th></tr></thead><tbody id="auditRows"><tr><td colspan="4" class="table-empty">正在读取记录…</td></tr></tbody></table></div>
+    </section>
+  </main>
+
+  <dialog id="customerDialog" class="admin-dialog" aria-labelledby="customerDialogTitle">
+    <div class="dialog-heading"><div><p class="eyebrow">Customer workspace</p><h2 id="customerDialogTitle">客户详情</h2></div><button id="customerDialogClose" class="icon-button" type="button" aria-label="关闭">×</button></div>
+    <div id="customerDialogBody" class="customer-dialog-body">正在读取…</div>
+    <div class="dialog-actions"><button id="customerDialogRun" class="button primary" type="button">运行该客户任务</button><button id="customerDialogCloseBottom" class="button ghost" type="button">关闭</button></div>
+  </dialog>
+</body>
+</html>

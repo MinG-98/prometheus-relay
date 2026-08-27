@@ -12,10 +12,15 @@ in server memory, never returns captured Cookies to the browser, and writes the
 final login state only to the private data volume.
 
 The web console should listen on localhost and be served through HTTPS. Keep
-Basic Auth enabled unless another authenticated gateway fully protects it.
-Use HTTPS for QR login so the code and account metadata cannot be observed in
-transit. Do not use public GitHub Actions for real account tasks: keep account
-credentials and scheduled execution on the private VPS deployment.
+the built-in session authentication enabled, use a long administrator password,
+and create separate customer accounts instead of sharing the administrator
+login. Use HTTPS for QR login so the code and account metadata cannot be
+observed in transit. Do not use public GitHub Actions for real account tasks:
+keep account credentials and scheduled execution on the private VPS deployment.
+
+The `PROMETHEUS_RELAY_COOKIE_KEY` value encrypts Cookie data at rest. Store it
+only in the private VPS environment file and keep a protected backup; losing
+the key makes existing saved Cookie data unreadable.
 
 ## Reporting a vulnerability
 

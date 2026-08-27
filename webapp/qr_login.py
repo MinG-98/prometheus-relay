@@ -13,7 +13,12 @@ from utils.logger import setup_logger
 
 logger = setup_logger(name="prometheus-relay.qr", level="Info")
 
-from webapp.config_store import upsert_scanned_account
+from webapp.config_store import upsert_scanned_account as legacy_upsert_scanned_account
+from webapp.tenant_store import (
+    AccountOwnershipError,
+    TenantStoreError,
+    upsert_scanned_account as tenant_upsert_scanned_account,
+)
 
 if TYPE_CHECKING:
     from playwright.sync_api import Response
@@ -252,10 +257,11 @@ def sanitise_browser_cookies(cookies: object) -> list[dict]:
 
 
 class QRLoginManager:
-    def __init__(self) -> None:
+    def __init__(self, workspace_id: int | None = None) -> None:
         self._lock = threading.RLock()
         self._start_lock = threading.Lock()
         self._session: _QRSession | None = None
+        self.workspace_id = workspace_id
 
     def start(self) -> dict:
         with self._start_lock:
@@ -390,10 +396,18 @@ class QRLoginManager:
             session.message = "正在保存账号…"
 
         try:
-            account, created = upsert_scanned_account(
-                str(unique_id or ""), str(username or ""), cookies
-            )
-        except (OSError, ValueError) as exc:
+            if self.workspace_id is None:
+                account, created = legacy_upsert_scanned_account(
+                    str(unique_id or ""), str(username or ""), cookies
+                )
+            else:
+                account, created = tenant_upsert_scanned_account(
+                    self.workspace_id,
+                    str(unique_id or ""),
+                    str(username or ""),
+                    cookies,
+                )
+        except (OSError, ValueError, TenantStoreError) as exc:
             with self._lock:
                 if self._session is session:
                     session.status = "needs_details"
@@ -1253,7 +1267,31 @@ class QRLoginManager:
 
         if session.cancel_event.is_set():
             return
-        account, created = upsert_scanned_account(unique_id, username, cookies)
+        try:
+            if self.workspace_id is None:
+                account, created = legacy_upsert_scanned_account(
+                    unique_id, username, cookies
+                )
+            else:
+                account, created = tenant_upsert_scanned_account(
+                    self.workspace_id, unique_id, username, cookies
+                )
+        except AccountOwnershipError as exc:
+            with self._lock:
+                if self._session is session and session.status not in TERMINAL_STATES:
+                    session.status = "error"
+                    session.message = str(exc)
+                    session.pending_cookies = None
+                    session.qr_png = None
+            return
+        except (OSError, ValueError, TenantStoreError) as exc:
+            with self._lock:
+                if self._session is session and session.status not in TERMINAL_STATES:
+                    session.status = "error"
+                    session.message = str(exc)
+                    session.pending_cookies = None
+                    session.qr_png = None
+            return
         with self._lock:
             if self._session is not session or session.status in TERMINAL_STATES:
                 return
@@ -1383,5 +1421,29 @@ class QRLoginManager:
                 except Exception:
                     pass
 
+_MANAGERS_LOCK = threading.RLock()
+_MANAGERS: dict[int, QRLoginManager] = {}
 
+
+def qr_login_manager_for(workspace_id: int) -> QRLoginManager:
+    """Return the isolated QR manager for one customer workspace."""
+    workspace_id = int(workspace_id)
+    with _MANAGERS_LOCK:
+        manager = _MANAGERS.get(workspace_id)
+        if manager is None:
+            manager = QRLoginManager(workspace_id=workspace_id)
+            _MANAGERS[workspace_id] = manager
+        return manager
+
+
+def shutdown_qr_login_managers() -> None:
+    with _MANAGERS_LOCK:
+        managers = list(_MANAGERS.values())
+        _MANAGERS.clear()
+    for manager in managers:
+        manager.shutdown()
+
+
+# Kept for backwards-compatible unit tests and local integrations. New web
+# requests must use qr_login_manager_for() so sessions cannot cross users.
 qr_login_manager = QRLoginManager()

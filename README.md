@@ -31,11 +31,11 @@
 
 ## 项目概览
 
-Prometheus Relay 是一个面向个人自托管的抖音火花自动维护控制台（**Self-hosted Douyin streak automation console**）。它使用 VPS 上的 **Playwright + Chromium** 驱动抖音创作者中心，通过接近正常人工操作的方式向指定好友发送续火花消息。
+Prometheus Relay 是一个面向个人和小规模客户服务的抖音火花自动维护控制台（**Self-hosted Douyin streak automation console**）。它使用 VPS 上的 **Playwright + Chromium** 驱动抖音创作者中心，通过接近正常人工操作的方式向指定好友发送续火花消息。
 
-项目把二维码登录、短信二次验证、Cookie 会话管理、账号与目标好友、消息模板、定时任务和运行记录整合到一个简洁的网页控制台中。你可以将它部署在自己的 VPS 上，通过 Docker Compose 长期运行，并在需要时从网页完成登录、配置、手动运行和状态检查。
+项目把二维码登录、短信二次验证、Cookie 会话管理、账号与目标好友、消息模板、定时任务和运行记录整合到一个简洁的网页控制台中。管理员可以在管理后台创建客户账号；每位客户登录后只看到自己的工作区。你可以将它部署在自己的 VPS 上，通过 Docker Compose 长期运行，并在需要时从网页完成登录、配置、手动运行和状态检查。
 
-它适合希望把任务放在自己的服务器上长期运行，同时又不想手动维护环境变量、Cron 和浏览器脚本的个人用户。项目不依赖第三方托管任务平台，登录会话和运行数据保存在自有服务器的私有持久化卷中。
+它适合希望把任务放在自己的服务器上长期运行，同时又不想手动维护环境变量、Cron 和浏览器脚本的个人用户或小规模服务运营者。项目不依赖第三方托管任务平台，登录会话和运行数据保存在自有服务器的私有持久化卷中。
 
 <p align="center">
   <img src="docs/images/dashboard-preview.png" alt="Prometheus Relay dashboard preview" width="100%">
@@ -52,6 +52,7 @@ Prometheus Relay 是一个面向个人自托管的抖音火花自动维护控制
 
 | 模块 | 能力 |
 | --- | --- |
+| 多用户工作区 | 管理员创建、启用/禁用和删除客户；客户只能访问自己的账号、任务和日志 |
 | 扫码登录 | VPS 生成抖音登录二维码；支持手机确认后的短信二次验证，并自动抓取 Cookie、识别昵称和抖音号 |
 | 账号管理 | 支持多账号、多目标好友；重复扫码会刷新 Cookie 并保留已有目标好友 |
 | Cookie 备用 | 扫码不可用时仍可上传 Cookie-Editor JSON；已保存内容不会在网页回显 |
@@ -59,7 +60,7 @@ Prometheus Relay 是一个面向个人自托管的抖音火花自动维护控制
 | 好友匹配 | 默认按抖音号精确匹配，也可在必要时切换为原始昵称匹配 |
 | 消息内容 | 支持固定模板和 `[API]` 一言占位符，可选择内容分类 |
 | 可观测性 | 提供服务状态、下次运行、任务范围、最近结果、历史记录与原始日志 |
-| 自托管安全 | 默认仅监听本机地址，支持 Basic Auth、非 Root 容器与私有持久化卷 |
+| 自托管安全 | 默认仅监听本机地址，支持会话登录、Cookie 加密、非 Root 容器与私有持久化卷 |
 | 部署维护 | 提供 Docker Compose、systemd、健康检查、原子配置写入与私有持久化卷 |
 
 <a id="architecture"></a>
@@ -70,7 +71,8 @@ Prometheus Relay 是一个面向个人自托管的抖音火花自动维护控制
 flowchart LR
     U[浏览器] -->|HTTPS| R[Caddy / Nginx]
     R --> W[Web Console]
-    W --> D[(Private Data Volume)]
+    W --> A[Session Auth + RBAC]
+    W --> D[(Private SQLite Data Volume)]
     S[Scheduler] --> D
     W -->|手动触发| T[Task Runner]
     S -->|定时触发| T
@@ -81,11 +83,11 @@ flowchart LR
 
 | Compose 服务 | 职责 | 运行方式 |
 | --- | --- | --- |
-| `web` | 网页控制台、配置管理、手动触发 | 常驻 |
+| `web` | 登录入口、客户控制台、管理员后台、手动触发 | 常驻 |
 | `scheduler` | 读取网页计划并在指定时区触发任务 | 常驻 |
 | `worker` | 执行一次独立任务，适合 systemd 或命令行调用 | 按需 |
 
-所有服务共享同一私有数据卷。扫码二维码和短信验证码仅在登录会话期间短暂存在于 Web 进程内存中；Cookie 不会写入 Docker 镜像，网页接口也不会返回已保存的 Cookie 内容。
+所有服务共享同一私有数据卷。SQLite 中的 Cookie 使用 Fernet 加密保存；扫码二维码和短信验证码仅在登录会话期间短暂存在于 Web 进程内存中，网页接口也不会返回已保存的 Cookie 内容。客户隔离由后端工作区权限强制执行，前端隐藏仅用于改善体验。
 
 <a id="quick-start"></a>
 
@@ -113,7 +115,11 @@ sudo install -m 600 .env.web.example /etc/prometheus-relay/web.env
 sudo editor /etc/prometheus-relay/web.env
 ```
 
-请至少修改 `ADMIN_USERNAME` 和 `ADMIN_PASSWORD`，并为不同服务使用独立的长密码。
+请至少修改 `ADMIN_USERNAME`、`ADMIN_PASSWORD` 和 `PROMETHEUS_RELAY_COOKIE_KEY`，并为不同环境使用独立的长密码和 Fernet 密钥。密钥可用下面命令生成：
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
 
 ### 3. 启动服务
 
@@ -126,18 +132,18 @@ PROMETHEUS_RELAY_ENV_FILE=/etc/prometheus-relay/web.env \
 
 ### 4. 完成首次任务
 
-1. 在控制台点击“扫码添加”，等待 VPS 生成登录二维码。
-2. 使用抖音 App 扫码并在手机上确认登录。
-3. 如果抖音要求短信安全验证，等待页面选择短信方式并显示验证码输入框；将短信验证码填入网页后点击“提交验证码”。
-4. 验证成功后，账号会自动保存；检查显示的抖音号和昵称是否为本次登录的账号。
-5. 打开刚添加的账号，逐行填写目标好友抖音号并保存配置。
-6. 先手动运行一次并检查日志。
-7. 验证消息发送正常后，再启用每日自动运行。
+1. 管理员使用 `ADMIN_USERNAME` 和 `ADMIN_PASSWORD` 登录管理后台。
+2. 在“客户与运行管理”中创建客户账号；自动生成的临时密码只显示一次，请用安全方式交给客户。
+3. 客户使用自己的账号登录，不会看到其他客户的账号、任务和日志。
+4. 客户在控制台点击“扫码添加”，等待 VPS 生成登录二维码。
+5. 使用抖音 App 扫码并在手机上确认登录；如需短信安全验证，在网页输入验证码并提交。
+6. 验证成功后核对抖音号和昵称，逐行填写目标好友抖音号并保存配置。
+7. 先手动运行一次并检查日志；确认正常后，再启用每日自动运行。
 
 验证码只会在本次登录会话中短暂存在，不会写入配置或日志。扫码不可用时，可以使用账号编辑区中的 Cookie JSON 上传作为备用方式。
 
 > [!TIP]
-> 生产环境推荐使用仓库提供的 systemd 单元托管服务。完整命令、更新、备份和 Caddy 示例见 [Docker 网页部署说明](docs/docker-deployment.md)。
+> 生产环境推荐使用仓库提供的 systemd 单元托管服务。完整命令、更新、备份、客户门户和 Caddy 示例见 [Docker 网页部署说明](docs/docker-deployment.md)。
 
 <a id="documentation"></a>
 
@@ -197,6 +203,7 @@ tests/      配置与运行状态测试
 > Cookie 等同于账号登录凭证。不要将 Cookie、真实配置、运行日志或数据卷备份提交到 Git，也不要粘贴到 Issue、截图或聊天记录中。
 
 - 保持 `AUTH_ENABLED=true`，并使用 HTTPS 和独立强密码。
+- `PROMETHEUS_RELAY_COOKIE_KEY` 是解密账号 Cookie 的唯一密钥，必须只保存在 VPS 的私有配置文件中；丢失后无法读取已保存 Cookie。
 - 不要直接向公网开放 `18081` 端口。
 - 将 `/etc/prometheus-relay/web.env` 权限保持为 `600`。
 - 备份数据卷后，应按敏感凭证文件进行保存和销毁。
@@ -211,7 +218,7 @@ tests/      配置与运行状态测试
 
 ## 来源与许可
 
-Prometheus Relay 派生自 [2061360308/DouYinSparkFlow](https://github.com/2061360308/DouYinSparkFlow)，并在 MIT 许可下独立维护。当前项目新增了自托管网页控制台、扫码自动抓取 Cookie、账号管理、每日调度、运行历史、Docker/systemd 部署与安全加固。
+Prometheus Relay 派生自 [2061360308/DouYinSparkFlow](https://github.com/2061360308/DouYinSparkFlow)，并在 MIT 许可下独立维护。当前项目新增了多用户客户门户、扫码自动抓取 Cookie、账号管理、每日调度、运行历史、Docker/systemd 部署与安全加固。
 
 原作者及当前维护者版权均保留在 [LICENSE](LICENSE) 中，完整来源说明见 [NOTICE](NOTICE)。
 

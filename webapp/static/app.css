@@ -29,6 +29,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html {
   min-width: 320px;
   background: var(--page);
@@ -163,6 +167,45 @@ button {
 
 .status-pill.error .status-dot {
   background: var(--danger);
+}
+
+.header-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.user-menu {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.user-identity {
+  display: grid;
+  min-width: 0;
+  margin-right: 3px;
+  text-align: right;
+}
+
+.user-identity strong,
+.user-identity small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-identity strong {
+  max-width: 150px;
+  font-size: 12px;
+}
+
+.user-identity small {
+  color: var(--text-faint);
+  font-size: 10px;
 }
 
 .page-shell {
@@ -617,6 +660,15 @@ details[open] > summary .summary-chevron {
 
 .advanced-body {
   padding-top: 22px;
+}
+
+.system-settings-note {
+  margin: 16px 0 0;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: var(--primary-soft);
+  color: var(--text-soft);
+  font-size: 11px;
 }
 
 .checkbox-fieldset {
@@ -1215,6 +1267,20 @@ pre {
   white-space: pre-line;
 }
 
+.password-dialog {
+  width: min(430px, calc(100% - 32px));
+}
+
+.password-form .field {
+  margin-bottom: 14px;
+}
+
+.password-error {
+  margin: 2px 0 16px !important;
+  color: var(--danger) !important;
+  font-size: 12px;
+}
+
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
@@ -1635,6 +1701,32 @@ noscript {
 
   .topbar-inner {
     min-height: 62px;
+  }
+
+  .header-actions {
+    gap: 5px;
+  }
+
+  .user-menu {
+    gap: 2px;
+  }
+
+  .user-identity {
+    max-width: 82px;
+  }
+
+  .user-identity strong {
+    max-width: 82px;
+  }
+
+  .user-identity small {
+    display: none;
+  }
+
+  .user-menu .button {
+    min-height: 32px;
+    padding: 6px 7px;
+    font-size: 11px;
   }
 
   .brand small {

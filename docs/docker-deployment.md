@@ -1,6 +1,6 @@
 # Docker 网页部署
 
-Prometheus Relay 由三个 Compose 服务组成：`web` 提供管理控制台，`scheduler` 负责每日计划，`worker` 执行单次浏览器任务。三者共享私有数据卷，Cookie 不会写入镜像。
+Prometheus Relay 由三个 Compose 服务组成：`web` 提供登录、客户控制台和管理后台，`scheduler` 负责每日计划，`worker` 执行单次浏览器任务。三者共享私有数据卷，Cookie 不会写入镜像。
 
 ## 首次部署
 
@@ -23,7 +23,9 @@ sudo systemctl enable --now prometheus-relay-web.service
 sudo systemctl enable --now prometheus-relay-scheduler.service
 ```
 
-控制台默认监听 `127.0.0.1:18081`，应通过 Caddy、Nginx 或其他反向代理提供 HTTPS，不应直接暴露该端口。默认启用 Basic Auth；请在 `web.env` 中设置长且唯一的密码，并保持文件权限为 `600`。
+`web` 默认监听 `127.0.0.1:18081`，应通过 Caddy、Nginx 或其他反向代理提供 HTTPS，不应直接暴露该端口。默认启用会话登录：管理员账号来自 `web.env`，客户账号由管理员在后台创建。`PROMETHEUS_RELAY_COOKIE_KEY` 必须是有效的 Fernet 密钥并保持私密；它用于加密 SQLite 中的 Cookie。
+
+首次进入后，管理员访问管理后台创建客户。客户使用管理员交付的客户账号登录，只能看到自己的工作区。禁用客户会同时阻止其登录和后续定时任务；删除客户会删除该客户工作区中的账号、Cookie、目标和运行记录。
 
 ## 网页配置
 
@@ -43,6 +45,8 @@ sudo systemctl enable --now prometheus-relay-scheduler.service
 sudo systemctl start prometheus-relay-worker.service
 sudo journalctl -u prometheus-relay-worker.service -n 200 --no-pager
 ```
+
+该兼容性 one-shot 单元默认执行迁移后的管理员工作区。客户任务应从客户控制台点击“立即运行”，或交给 `scheduler`；这样每次任务都会带有明确的工作区范围。
 
 网页内也可以直接运行任务并查看最近日志。
 
@@ -66,6 +70,26 @@ sudo docker run --rm \
 ```
 
 备份文件包含 Cookie，不要上传到公共位置。
+
+## 并行验收新版本
+
+升级多用户门户时，建议使用独立目录、Compose 项目、端口和数据卷，先验证再切换现有服务：
+
+```bash
+sudo git clone --branch feature/customer-portal https://github.com/MinG-98/prometheus-relay.git /opt/prometheus-relay-next
+sudo mkdir -p /etc/prometheus-relay-next
+sudo install -m 600 /opt/prometheus-relay-next/.env.web.example /etc/prometheus-relay-next/web.env
+sudo editor /etc/prometheus-relay-next/web.env
+
+cd /opt/prometheus-relay-next
+sudo PROMETHEUS_RELAY_ENV_FILE=/etc/prometheus-relay-next/web.env \
+  PROMETHEUS_RELAY_WEB_PORT=18082 \
+  PROMETHEUS_RELAY_DATA_VOLUME=prometheus-relay-next-data \
+  PROMETHEUS_RELAY_LOGS_VOLUME=prometheus-relay-next-logs \
+  docker compose -p prometheus-relay-next up -d --build web
+```
+
+验收期间不要启动新版本的 `scheduler`，也不要让新版本使用现网数据卷。确认管理员登录、创建客户、客户登录、扫码/上传 Cookie、客户数据隔离和手动任务都正常后，再单独启动新版本调度器。切换时保留旧目录和旧数据卷，出现问题可停止新项目并恢复原服务。
 
 ## 反向代理示例
 

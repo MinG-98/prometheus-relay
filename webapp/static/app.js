@@ -35,6 +35,10 @@
   let qrVerificationReady = false;
   let qrCompletionHandled = false;
 
+  function viewerIsAdmin() {
+    return appState?.viewer?.role === "platform_admin";
+  }
+
   function escapeHtml(value) {
     return String(value ?? "").replace(/[&<>"']/g, (character) => ({
       "&": "&amp;",
@@ -54,12 +58,17 @@
     if (options.body && !headers["Content-Type"]) {
       headers["Content-Type"] = "application/json";
     }
-    return fetch(`${basePath}${path}`, {
+    const response = await fetch(`${basePath}${path}`, {
       cache: "no-store",
       credentials: "same-origin",
       ...options,
       headers,
     });
+    if (response.status === 401 && location.pathname !== "/login") {
+      window.location.assign("/login");
+      throw new Error("登录已过期");
+    }
+    return response;
   }
 
   async function responseError(response) {
@@ -202,6 +211,24 @@
     };
   }
 
+  function renderViewer() {
+    const viewer = appState?.viewer || {};
+    $("userDisplayName").textContent = viewer.displayName || viewer.username || "客户控制台";
+    $("userRoleLabel").textContent = viewerIsAdmin() ? "管理员" : "客户工作区";
+  }
+
+  function configureRoleVisibility() {
+    const admin = viewerIsAdmin();
+    document.body.classList.toggle("admin-view", admin);
+    document.querySelectorAll("[data-system-setting]").forEach((element) => {
+      element.hidden = !admin;
+    });
+    $("systemSettingsNote").hidden = admin;
+    $("advancedSummaryText").textContent = admin
+      ? "匹配方式、超时、代理和一言类型"
+      : "匹配方式和一言内容类型";
+  }
+
   function latestCompletedRun() {
     const history = (appState?.history || []).filter((item) => item && !item.running);
     if (history.length) return history[history.length - 1];
@@ -218,6 +245,10 @@
     const schedule = currentSchedule();
     const health = schedulerHealth();
     const latest = latestCompletedRun();
+    const maxAccounts = Number(appState.limits?.maxAccounts) || 20;
+    const maxTargets = Number(appState.limits?.maxTargets) || 100;
+
+    $("accountsDescription").textContent = `优先扫码登录；每个账号会使用独立登录状态向目标好友发送消息。当前上限：${maxAccounts} 个账号，每个账号 ${maxTargets} 位目标好友。`;
 
     if (running) {
       $("taskMetric").textContent = "正在运行";
@@ -313,6 +344,7 @@
   }
 
   function renderSettings() {
+    configureRoleVisibility();
     const settings = appState?.config?.settings || {};
     const schedule = {
       enabled: false,
@@ -618,6 +650,7 @@
     const running = Boolean(appState.status?.running);
     const pendingCookie = Boolean(document.querySelector("[data-cookie-file-pending]"));
     const counts = formCounts();
+    const maxAccounts = Number(appState.limits?.maxAccounts) || 20;
     const saveButton = $("save");
     const runButton = $("run");
     const addButton = $("addAccount");
@@ -629,8 +662,8 @@
 
     saveButton.disabled = !dirty || running || Boolean(busyAction) || pendingCookie;
     runButton.disabled = dirty || running || Boolean(busyAction) || counts.accounts === 0 || counts.targets === 0;
-    addButton.disabled = running || Boolean(busyAction) || counts.accounts >= 20 || pendingCookie;
-    scanButton.disabled = dirty || running || Boolean(busyAction) || counts.accounts >= 20 || pendingCookie || qrOpen;
+    addButton.disabled = running || Boolean(busyAction) || counts.accounts >= maxAccounts || pendingCookie;
+    scanButton.disabled = dirty || running || Boolean(busyAction) || counts.accounts >= maxAccounts || pendingCookie || qrOpen;
     qrProbe.disabled = Boolean(busyAction)
       || !qrOpen
       || !["waiting_scan", "scanned", "verification_required"].includes(qrState);
@@ -691,7 +724,7 @@
 
     if (dirty) scanButton.title = "请先保存当前更改再扫码添加账号";
     else if (running) scanButton.title = "任务运行时不能扫码添加账号";
-    else if (counts.accounts >= 20) scanButton.title = "最多支持 20 个账号";
+    else if (counts.accounts >= maxAccounts) scanButton.title = `最多支持 ${maxAccounts} 个账号`;
     else if (qrOpen) scanButton.title = "扫码窗口已打开";
     else scanButton.removeAttribute("title");
   }
@@ -727,15 +760,9 @@
       throw new FormValidationError("请填写定时运行时区", $("scheduleTimezone"));
     }
 
-    const browserTimeout = requireNumber("browserTimeout", 1, 600, "浏览器超时");
-    const friendListTimeout = requireNumber("friendListTimeout", 0, 60, "好友加载等待");
-    const taskRetryTimes = requireNumber("taskRetryTimes", 1, 10, "失败重试次数");
-    if (!Number.isInteger(taskRetryTimes)) {
-      throw new FormValidationError("失败重试次数必须是整数", $("taskRetryTimes"));
-    }
-
     const seenIds = new Set();
     const matchMode = $("matchMode").value;
+    const maxTargets = Number(appState?.limits?.maxTargets) || 100;
     const accounts = [...document.querySelectorAll(".account-card")].map((card, index) => {
       const uniqueIdInput = card.querySelector(".unique-id");
       const usernameInput = card.querySelector(".username");
@@ -759,6 +786,9 @@
         if (invalidTarget) {
           throw new FormValidationError(`账号 ${index + 1}：目标抖音号“${invalidTarget}”格式不正确`, targetsInput);
         }
+      }
+      if (targets.length > maxTargets) {
+        throw new FormValidationError(`账号 ${index + 1}：最多只能填写 ${maxTargets} 位目标好友`, targetsInput);
       }
 
       const account = { unique_id: uniqueId, username, targets };
@@ -790,22 +820,33 @@
       return account;
     });
 
-    return {
-      settings: {
-        proxyAddress: $("proxyAddress").value.trim(),
+    const settings = {
         messageTemplate,
         hitokotoTypes: [...$("hitokotoTypes").querySelectorAll("input:checked")].map((input) => input.value),
         matchMode,
-        browserTimeout: Math.round(browserTimeout * 1000),
-        friendListTimeout: Math.round(friendListTimeout * 1000),
-        taskRetryTimes,
-        logLevel: $("logLevel").value,
         schedule: {
           enabled: $("scheduleEnabled").checked,
           time: scheduleTime,
           timezone: scheduleTimezone,
         },
-      },
+    };
+    if (viewerIsAdmin()) {
+      const browserTimeout = requireNumber("browserTimeout", 1, 600, "浏览器超时");
+      const friendListTimeout = requireNumber("friendListTimeout", 0, 60, "好友加载等待");
+      const taskRetryTimes = requireNumber("taskRetryTimes", 1, 10, "失败重试次数");
+      if (!Number.isInteger(taskRetryTimes)) {
+        throw new FormValidationError("失败重试次数必须是整数", $("taskRetryTimes"));
+      }
+      Object.assign(settings, {
+        proxyAddress: $("proxyAddress").value.trim(),
+        browserTimeout: Math.round(browserTimeout * 1000),
+        friendListTimeout: Math.round(friendListTimeout * 1000),
+        taskRetryTimes,
+        logLevel: $("logLevel").value,
+      });
+    }
+    return {
+      settings,
       accounts,
     };
   }
@@ -875,8 +916,9 @@
 
   function addAccount() {
     const accounts = appState?.config?.accounts || [];
-    if (accounts.length >= 20) {
-      showToast("最多支持 20 个账号", "error");
+    const maxAccounts = Number(appState?.limits?.maxAccounts) || 20;
+    if (accounts.length >= maxAccounts) {
+      showToast(`最多支持 ${maxAccounts} 个账号`, "error");
       return;
     }
     if (document.querySelector("[data-cookie-file-pending]")) {
@@ -1133,8 +1175,9 @@
       return;
     }
     if (appState?.status?.running || busyAction) return;
-    if ((appState?.config?.accounts || []).length >= 20) {
-      showToast("最多支持 20 个账号", "error");
+    const maxAccounts = Number(appState?.limits?.maxAccounts) || 20;
+    if ((appState?.config?.accounts || []).length >= maxAccounts) {
+      showToast(`最多支持 ${maxAccounts} 个账号`, "error");
       return;
     }
 
@@ -1408,12 +1451,17 @@
       if (!appState) {
         appState = nextState;
         baselineFingerprint = nextFingerprint;
+        renderViewer();
         renderSettings();
         renderAccounts();
       } else {
+        appState.viewer = nextState.viewer || appState.viewer;
+        appState.limits = nextState.limits || appState.limits || {};
         appState.status = nextState.status || {};
         appState.history = nextState.history || [];
         appState.scheduler = nextState.scheduler || {};
+        renderViewer();
+        configureRoleVisibility();
         if (nextFingerprint !== baselineFingerprint) {
           if (dirty) {
             remoteConfigChanged = true;
@@ -1458,6 +1506,63 @@
     updateScheduleSummary();
   }
 
+  function openPasswordDialog() {
+    const dialog = $("passwordDialog");
+    $("passwordForm").reset();
+    $("passwordError").hidden = true;
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "open");
+    window.setTimeout(() => $("newPassword").focus(), 0);
+  }
+
+  async function submitPassword(event) {
+    event.preventDefault();
+    const password = $("newPassword").value;
+    const confirmation = $("confirmPassword").value;
+    const error = $("passwordError");
+    error.hidden = true;
+    if (password.length < 8) {
+      error.textContent = "密码至少需要 8 位";
+      error.hidden = false;
+      $("newPassword").focus();
+      return;
+    }
+    if (password !== confirmation) {
+      error.textContent = "两次输入的密码不一致";
+      error.hidden = false;
+      $("confirmPassword").focus();
+      return;
+    }
+    const button = $("passwordSubmit");
+    button.disabled = true;
+    button.textContent = "保存中…";
+    try {
+      const response = await api("api/auth/password", {
+        method: "POST",
+        body: JSON.stringify({ password }),
+      });
+      if (!response.ok) throw new Error(await responseError(response));
+      $("passwordDialog").close();
+      showToast("密码已修改，请使用新密码重新登录");
+      window.setTimeout(() => window.location.assign("/login"), 700);
+    } catch (submitError) {
+      error.textContent = submitError.message || "密码修改失败";
+      error.hidden = false;
+    } finally {
+      button.disabled = false;
+      button.textContent = "保存新密码";
+    }
+  }
+
+  async function logout() {
+    try {
+      await api("api/auth/logout", { method: "POST" });
+    } catch (_error) {
+      // Redirect even if the session already expired.
+    }
+    window.location.assign("/login");
+  }
+
   function bindStaticEvents() {
     document.addEventListener("input", (event) => {
       const target = event.target;
@@ -1487,6 +1592,10 @@
     });
 
     $("scheduleTime").addEventListener("blur", normaliseTimeField);
+    $("changePassword").addEventListener("click", openPasswordDialog);
+    $("logout").addEventListener("click", logout);
+    $("passwordForm").addEventListener("submit", submitPassword);
+    $("passwordCancel").addEventListener("click", () => $("passwordDialog").close());
     $("scanAccount").addEventListener("click", beginQrLogin);
     $("addAccount").addEventListener("click", addAccount);
     $("qrRestart").addEventListener("click", restartQrLogin);

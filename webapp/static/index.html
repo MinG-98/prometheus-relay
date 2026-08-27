@@ -7,8 +7,8 @@
   <meta name="description" content="Prometheus Relay 自托管续火花控制台">
   <title>Prometheus Relay · 续火花控制台</title>
   <link rel="icon" href="static/mark.svg?v=20260822-2" type="image/svg+xml">
-  <link rel="stylesheet" href="static/app.css?v=20260822-2">
-  <script src="static/app.js?v=20260822-2" defer></script>
+  <link rel="stylesheet" href="static/app.css?v=20260826-2">
+  <script src="static/app.js?v=20260826-2" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#mainContent">跳到主要内容</a>
@@ -22,9 +22,19 @@
           <small>Keep the fire alive.</small>
         </span>
       </div>
-      <div id="headerStatus" class="status-pill neutral" role="status">
-        <span class="status-dot" aria-hidden="true"></span>
-        <span>正在连接</span>
+      <div class="header-actions">
+        <div id="userMenu" class="user-menu">
+          <span class="user-identity">
+            <strong id="userDisplayName">客户控制台</strong>
+            <small id="userRoleLabel">客户</small>
+          </span>
+          <button id="changePassword" class="button ghost compact" type="button">修改密码</button>
+          <button id="logout" class="button ghost compact" type="button">退出</button>
+        </div>
+        <div id="headerStatus" class="status-pill neutral" role="status">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span>正在连接</span>
+        </div>
       </div>
     </div>
   </header>
@@ -123,11 +133,11 @@
             <p id="scheduleSummary" class="inline-note">自动运行尚未启用。</p>
           </div>
 
-          <details class="advanced-settings">
+          <details id="advancedSettings" class="advanced-settings">
             <summary>
               <span>
                 <strong>高级设置</strong>
-                <small>匹配方式、超时、代理和一言类型</small>
+                <small id="advancedSummaryText">匹配方式、超时、代理和一言类型</small>
               </span>
               <span class="summary-chevron" aria-hidden="true">⌄</span>
             </summary>
@@ -140,7 +150,7 @@
                     <option value="nickname">好友昵称</option>
                   </select>
                 </div>
-                <div class="field">
+                <div class="field" data-system-setting>
                   <label for="logLevel">日志级别</label>
                   <select id="logLevel">
                     <option value="Info">普通（Info）</option>
@@ -150,12 +160,12 @@
                   </select>
                 </div>
               </div>
-              <div class="field">
+              <div class="field" data-system-setting>
                 <label for="proxyAddress">浏览器代理</label>
                 <input id="proxyAddress" type="text" placeholder="留空表示不使用，例如 http://127.0.0.1:7890" autocomplete="off">
                 <p class="field-help">仅在 VPS 必须通过代理访问抖音时填写。</p>
               </div>
-              <div class="form-grid three-columns">
+              <div class="form-grid three-columns" data-system-setting>
                 <div class="field">
                   <label for="browserTimeout">浏览器超时（秒）</label>
                   <input id="browserTimeout" type="number" min="1" max="600" step="1">
@@ -174,6 +184,7 @@
                 <p class="field-help">只有发送内容包含 <code>[API]</code> 时才会使用。</p>
                 <div id="hitokotoTypes" class="checkbox-grid"></div>
               </fieldset>
+              <p id="systemSettingsNote" class="system-settings-note" hidden>浏览器代理、超时、重试和日志级别由管理员统一维护。</p>
             </div>
           </details>
         </section>
@@ -259,6 +270,27 @@
       <button id="confirmCancel" class="button ghost" type="button">取消</button>
       <button id="confirmAction" class="button primary" type="button">确认</button>
     </div>
+  </dialog>
+
+  <dialog id="passwordDialog" class="confirm-dialog password-dialog" aria-labelledby="passwordTitle">
+    <div class="dialog-icon" aria-hidden="true">⌁</div>
+    <h2 id="passwordTitle">修改控制台密码</h2>
+    <p>修改后当前登录会话会立即失效，需要使用新密码重新登录。</p>
+    <form id="passwordForm" class="password-form">
+      <div class="field">
+        <label for="newPassword">新密码</label>
+        <input id="newPassword" type="password" autocomplete="new-password" minlength="8" maxlength="256" required>
+      </div>
+      <div class="field">
+        <label for="confirmPassword">确认新密码</label>
+        <input id="confirmPassword" type="password" autocomplete="new-password" minlength="8" maxlength="256" required>
+      </div>
+      <p id="passwordError" class="password-error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button id="passwordCancel" class="button ghost" type="button">取消</button>
+        <button id="passwordSubmit" class="button primary" type="submit">保存新密码</button>
+      </div>
+    </form>
   </dialog>
 
   <dialog id="qrDialog" class="qr-dialog" aria-labelledby="qrTitle" aria-describedby="qrMessage">

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f7fb">
+  <meta name="description" content="Prometheus Relay 登录">
+  <title>登录 · Prometheus Relay</title>
+  <link rel="icon" href="static/mark.svg?v=20260822-2" type="image/svg+xml">
+  <link rel="stylesheet" href="static/app.css?v=20260822-2">
+  <link rel="stylesheet" href="static/login.css?v=20260826-1">
+  <script src="static/login.js?v=20260826-1" defer></script>
+</head>
+<body class="login-page">
+  <main class="login-shell">
+    <section class="login-card" aria-labelledby="loginTitle">
+      <div class="login-brand">
+        <img class="brand-mark" src="static/mark.svg?v=20260822-2" alt="">
+        <div>
+          <strong>Prometheus Relay</strong>
+          <small>Keep the fire alive.</small>
+        </div>
+      </div>
+      <p class="eyebrow">安全入口</p>
+      <h1 id="loginTitle">登录你的控制台</h1>
+      <p class="login-intro">管理自己的抖音账号、目标好友和定时任务。</p>
+      <form id="loginForm" class="login-form">
+        <div class="field">
+          <label for="username">用户名</label>
+          <input id="username" name="username" type="text" autocomplete="username" required maxlength="64" autofocus>
+        </div>
+        <div class="field">
+          <label for="password">密码</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="256">
+        </div>
+        <p id="loginError" class="login-error" role="alert" hidden></p>
+        <button id="loginButton" class="button primary login-submit" type="submit">登录</button>
+      </form>
+      <p class="login-note">请使用管理员提供的控制台账号。抖音登录在进入控制台后单独完成。</p>
+    </section>
+  </main>
+</body>
+</html>
