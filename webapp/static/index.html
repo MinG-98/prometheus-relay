@@ -7,10 +7,10 @@
   <meta name="description" content="Prometheus Relay 自托管续火花控制台">
   <title>Prometheus Relay · 续火花控制台</title>
   <link rel="icon" href="static/mark.svg?v=20260822-2" type="image/svg+xml">
-  <link rel="stylesheet" href="static/app.css?v=20260826-2">
-  <script src="static/app.js?v=20260826-2" defer></script>
+  <link rel="stylesheet" href="static/app.css?v=20260826-3">
+  <script src="static/app.js?v=20260826-3" defer></script>
 </head>
-<body>
+<body class="client-page">
   <a class="skip-link" href="#mainContent">跳到主要内容</a>
 
   <header class="topbar">
@@ -47,7 +47,6 @@
           <h1 id="overviewTitle">今天的任务</h1>
         </div>
         <button id="refresh" class="button ghost compact" type="button" aria-label="刷新页面状态">
-          <span aria-hidden="true">↻</span>
           刷新
         </button>
       </div>
@@ -76,15 +75,20 @@
       </div>
     </section>
 
-    <div class="content-grid">
-      <div class="main-column">
-        <section class="panel" aria-labelledby="dailySettingsTitle">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">日常设置</p>
+    <div class="client-workspace">
+      <div class="client-main-column">
+        <details id="dailySettingsSection" class="panel client-section" open>
+          <summary class="client-section-summary">
+            <span class="client-section-copy">
+              <span class="eyebrow">日常设置</span>
               <h2 id="dailySettingsTitle">消息与定时</h2>
-            </div>
-          </div>
+              <small>设置发送内容和每天执行时间</small>
+            </span>
+            <span class="summary-chevron" aria-hidden="true">
+              <svg viewBox="0 0 20 20" focusable="false"><path d="m5 7.5 5 5 5-5" /></svg>
+            </span>
+          </summary>
+          <div class="client-section-body">
 
           <div class="field">
             <div class="label-row">
@@ -139,7 +143,9 @@
                 <strong>高级设置</strong>
                 <small id="advancedSummaryText">匹配方式、超时、代理和一言类型</small>
               </span>
-              <span class="summary-chevron" aria-hidden="true">⌄</span>
+              <span class="summary-chevron" aria-hidden="true">
+                <svg viewBox="0 0 20 20" focusable="false"><path d="m5 7.5 5 5 5-5" /></svg>
+              </span>
             </summary>
             <div class="advanced-body">
               <div class="form-grid two-columns">
@@ -187,61 +193,55 @@
               <p id="systemSettingsNote" class="system-settings-note" hidden>浏览器代理、超时、重试和日志级别由管理员统一维护。</p>
             </div>
           </details>
-        </section>
+          </div>
+        </details>
 
-        <section class="panel accounts-panel" aria-labelledby="accountsTitle">
-          <div class="section-heading account-heading">
-            <div>
-              <p class="eyebrow">发送账号</p>
+        <details id="accountsSection" class="panel client-section accounts-panel" open>
+          <summary class="client-section-summary">
+            <span class="client-section-copy">
+              <span class="eyebrow">发送账号</span>
               <h2 id="accountsTitle">账号与目标好友</h2>
-              <p id="accountsDescription" class="section-description">优先扫码登录；每个账号会使用独立登录状态向目标好友发送消息。</p>
+              <small>管理账号、目标好友和登录状态</small>
+            </span>
+            <span class="summary-chevron" aria-hidden="true">
+              <svg viewBox="0 0 20 20" focusable="false"><path d="m5 7.5 5 5 5-5" /></svg>
+            </span>
+          </summary>
+          <div class="client-section-body">
+            <div class="section-heading account-heading">
+              <div>
+                <p id="accountsDescription" class="section-description">优先扫码登录；每个账号会使用独立登录状态向目标好友发送消息。</p>
+              </div>
+              <div class="account-heading-actions">
+                <button id="scanAccount" class="button primary" type="button">扫码添加</button>
+                <button id="addAccount" class="button secondary" type="button">手动添加</button>
+              </div>
             </div>
-            <div class="account-heading-actions">
-              <button id="scanAccount" class="button primary" type="button">
-                <span aria-hidden="true">▦</span>
-                扫码添加
-              </button>
-              <button id="addAccount" class="button secondary" type="button">
-                <span aria-hidden="true">＋</span>
-                手动添加
-              </button>
+            <div id="accounts" class="account-list" aria-describedby="accountsDescription">
+              <div class="loading-placeholder">正在读取账号…</div>
             </div>
           </div>
-          <div id="accounts" class="account-list" aria-describedby="accountsDescription">
-            <div class="loading-placeholder">正在读取账号…</div>
-          </div>
-        </section>
+        </details>
       </div>
 
-      <aside class="side-column" aria-label="运行信息">
-        <section class="panel history-panel" aria-labelledby="historyTitle">
-          <div class="section-heading compact-heading">
-            <div>
-              <p class="eyebrow">执行记录</p>
+      <aside class="client-side-column" aria-label="运行信息">
+        <details id="historyDetails" class="panel client-section history-panel" open>
+          <summary class="client-section-summary">
+            <span class="client-section-copy">
+              <span class="eyebrow">执行记录</span>
               <h2 id="historyTitle">最近运行</h2>
+              <small>查看最近任务结果</small>
+            </span>
+            <span class="summary-chevron" aria-hidden="true">
+              <svg viewBox="0 0 20 20" focusable="false"><path d="m5 7.5 5 5 5-5" /></svg>
+            </span>
+          </summary>
+          <div class="client-section-body">
+            <div id="runHistory" class="history-list" aria-live="polite">
+              <div class="empty-compact">尚无运行记录</div>
             </div>
           </div>
-          <div id="runHistory" class="history-list" aria-live="polite">
-            <div class="empty-compact">尚无运行记录</div>
-          </div>
-        </section>
-
-        <section class="panel log-panel" aria-labelledby="logTitle">
-          <details id="logDetails">
-            <summary>
-              <span>
-                <span class="eyebrow">排查问题</span>
-                <strong id="logTitle">原始运行日志</strong>
-              </span>
-              <span class="summary-chevron" aria-hidden="true">⌄</span>
-            </summary>
-            <div class="log-actions">
-              <span id="logUpdatedAt" class="muted">尚未读取</span>
-              <button id="copyLog" class="text-button" type="button">复制日志</button>
-            </div>
-            <pre id="logs" tabindex="0">暂无日志</pre>
-          </details>
-        </section>
+        </details>
       </aside>
     </div>
   </main>
@@ -263,7 +263,9 @@
   </div>
 
   <dialog id="confirmDialog" class="confirm-dialog" aria-labelledby="confirmTitle" aria-describedby="confirmBody">
-    <div class="dialog-icon" aria-hidden="true">!</div>
+    <div class="dialog-icon" aria-hidden="true">
+      <svg viewBox="0 0 20 20" focusable="false"><circle cx="10" cy="10" r="6.8" /><path d="M10 6.7v4.2M10 13.5v.1" /></svg>
+    </div>
     <h2 id="confirmTitle">确认操作</h2>
     <p id="confirmBody"></p>
     <div class="dialog-actions">
@@ -273,7 +275,9 @@
   </dialog>
 
   <dialog id="passwordDialog" class="confirm-dialog password-dialog" aria-labelledby="passwordTitle">
-    <div class="dialog-icon" aria-hidden="true">⌁</div>
+    <div class="dialog-icon" aria-hidden="true">
+      <svg viewBox="0 0 20 20" focusable="false"><path d="M6.5 9V6.8a3.5 3.5 0 0 1 7 0V9M5 9h10v7H5z" /></svg>
+    </div>
     <h2 id="passwordTitle">修改控制台密码</h2>
     <p>修改后当前登录会话会立即失效，需要使用新密码重新登录。</p>
     <form id="passwordForm" class="password-form">
@@ -299,7 +303,9 @@
         <p class="eyebrow">免 Cookie 配置</p>
         <h2 id="qrTitle">扫码添加抖音账号</h2>
       </div>
-      <button id="qrClose" class="icon-button qr-close" type="button" aria-label="关闭扫码登录">×</button>
+      <button id="qrClose" class="icon-button qr-close" type="button" aria-label="关闭扫码登录">
+        <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true"><path d="m5.5 5.5 9 9M14.5 5.5l-9 9" /></svg>
+      </button>
     </div>
 
     <div class="qr-dialog-grid">

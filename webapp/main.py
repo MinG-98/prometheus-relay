@@ -352,8 +352,8 @@ def state(principal: dict = Depends(require_customer)):
 
 
 @app.get("/api/log")
-def log(principal: dict = Depends(require_customer)):
-    return {"log": read_workspace_log(_customer_workspace(principal))}
+def log(_: dict = Depends(require_customer)):
+    raise HTTPException(status_code=403, detail="客户无权读取原始运行日志")
 
 
 @app.post("/api/config")

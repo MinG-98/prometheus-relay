@@ -26,7 +26,6 @@
   let actionError = "";
   let remoteConfigChanged = false;
   let requestInFlight = false;
-  let logText = "";
   let toastTimer = null;
   let qrPollTimer = null;
   let qrImageRevision = 0;
@@ -415,7 +414,7 @@
       const targetText = draft?.targets ?? (account.targets || []).join("\n");
       const targetCount = parseTargets(targetText).length;
       const hasCookies = Boolean(account.hasCookies);
-      const editorOpen = draft?.editorOpen ?? !hasCookies;
+      const editorOpen = draft?.editorOpen ?? (!hasCookies && !uniqueId && !username);
       const displayName = username || `新账号 ${index + 1}`;
       const avatar = [...displayName][0]?.toUpperCase() || String(index + 1);
       const cookieStatus = draft?.cookieFileStatus
@@ -462,14 +461,22 @@
 
             <div class="cookie-area">
               <p class="form-section-title">备用登录方式</p>
-              <div class="cookie-callout"><span aria-hidden="true">●</span><span>Cookie 相当于登录凭证。网页不会回显已保存内容，也不要把文件发送给别人。</span></div>
+              <div class="cookie-callout">
+                <span class="cookie-callout-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" focusable="false"><path d="M6.5 9V6.8a3.5 3.5 0 0 1 7 0V9M5 9h10v7H5z" /></svg>
+                </span>
+                <span>Cookie 相当于登录凭证。网页不会回显已保存内容，也不要把文件发送给别人。</span>
+              </div>
               <div class="field">
                 <label for="account-${index}-cookie-file">上传 Cookie JSON 文件</label>
                 <input id="account-${index}-cookie-file" class="cookie-file" type="file" accept=".json,application/json,text/json">
                 <span class="cookie-status ${escapeHtml(cookieStatusType)}" data-type="${escapeHtml(cookieStatusType)}">${escapeHtml(cookieStatus)}</span>
               </div>
               <details class="manual-cookie"${draft?.cookies ? " open" : ""}>
-                <summary>也可以手动粘贴 Cookie JSON</summary>
+                <summary>
+                  <span>也可以手动粘贴 Cookie JSON</span>
+                  <svg class="summary-inline-chevron" viewBox="0 0 20 20" focusable="false" aria-hidden="true"><path d="m5 7.5 5 5 5-5" /></svg>
+                </summary>
                 <div class="field">
                   <label class="visually-hidden" for="account-${index}-cookies">Cookie JSON</label>
                   <textarea id="account-${index}-cookies" class="cookies" rows="5" spellcheck="false" placeholder="粘贴 Cookie-Editor 导出的 JSON 数组">${escapeHtml(draft?.cookies || "")}</textarea>
@@ -678,9 +685,7 @@
     scanButton.classList.toggle("loading", busyAction === "qr");
     qrProbe.classList.toggle("loading", busyAction === "probe");
     qrVerify.classList.toggle("loading", busyAction === "verify");
-    scanButton.innerHTML = busyAction === "qr"
-      ? "正在启动…"
-      : '<span aria-hidden="true">▦</span>扫码添加';
+    scanButton.textContent = busyAction === "qr" ? "正在启动…" : "扫码添加";
     qrProbe.textContent = busyAction === "probe"
       ? "正在检查…"
       : qrState === "verification_required"
@@ -975,11 +980,11 @@
     if (type === "loading") {
       placeholder.innerHTML = '<span class="qr-spinner" aria-hidden="true"></span><span></span>';
     } else if (type === "success") {
-      placeholder.innerHTML = '<span class="qr-success-mark" aria-hidden="true">✓</span><span></span>';
+      placeholder.innerHTML = '<span class="qr-success-mark" aria-hidden="true"><svg viewBox="0 0 20 20" focusable="false"><path d="m5 10.5 3.2 3.2L15 7" /></svg></span><span></span>';
     } else if (type === "verification") {
-      placeholder.innerHTML = '<span class="qr-verification-mark" aria-hidden="true">✉</span><span></span>';
+      placeholder.innerHTML = '<span class="qr-verification-mark" aria-hidden="true"><svg viewBox="0 0 20 20" focusable="false"><path d="M4.5 6.5h11v8h-11zM6.5 6.5l2.2 2h2.6l2.2-2" /></svg></span><span></span>';
     } else {
-      placeholder.innerHTML = '<span class="qr-success-mark" aria-hidden="true">!</span><span></span>';
+      placeholder.innerHTML = '<span class="qr-success-mark" aria-hidden="true"><svg viewBox="0 0 20 20" focusable="false"><path d="M10 5.5v5M10 13.5v1" /></svg></span><span></span>';
     }
     placeholder.lastElementChild.textContent = message;
   }
@@ -1420,25 +1425,6 @@
     }
   }
 
-  async function refreshLog() {
-    try {
-      const response = await api("api/log");
-      if (!response.ok) throw new Error(await responseError(response));
-      const payload = await response.json();
-      logText = payload.log || "";
-      $("logs").textContent = logText || "暂无日志";
-      $("logUpdatedAt").textContent = `更新于 ${new Intl.DateTimeFormat("zh-CN", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hourCycle: "h23",
-      }).format(new Date())}`;
-      $("copyLog").disabled = !logText;
-    } catch (_error) {
-      $("logUpdatedAt").textContent = "日志读取失败";
-    }
-  }
-
   async function refreshState({ notify = false } = {}) {
     if (requestInFlight) return;
     requestInFlight = true;
@@ -1475,7 +1461,6 @@
       }
 
       renderRuntime();
-      await refreshLog();
       if (notify) showToast(dirty ? "状态已刷新，未保存的草稿仍然保留" : "状态已刷新");
     } catch (error) {
       if (!appState) {
@@ -1624,18 +1609,6 @@
       await refreshState({ notify: true });
       busyAction = null;
       updateActionState();
-    });
-    $("logDetails").addEventListener("toggle", () => {
-      if ($("logDetails").open) refreshLog();
-    });
-    $("copyLog").addEventListener("click", async () => {
-      if (!logText) return;
-      try {
-        await navigator.clipboard.writeText(logText);
-        showToast("日志已复制");
-      } catch (_error) {
-        showToast("浏览器不允许复制，请在日志框中手动选择", "error");
-      }
     });
     window.addEventListener("beforeunload", (event) => {
       if (!dirty) return;

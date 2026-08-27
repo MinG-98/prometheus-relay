@@ -80,6 +80,7 @@ class PortalApiTests(unittest.TestCase):
             self.assertEqual(login.json()["user"]["workspaceId"], created.json()["user"]["workspaceId"])
 
             self.assertEqual(customer.get("/api/admin/users").status_code, 403)
+            self.assertEqual(customer.get("/api/log").status_code, 403)
             config_response = customer.post(
                 "/api/config",
                 json={
