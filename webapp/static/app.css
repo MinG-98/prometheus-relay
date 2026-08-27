@@ -2245,6 +2245,7 @@ noscript {
 
   .client-page .account-heading {
     align-items: flex-start;
+    flex-direction: column;
     gap: 14px;
     margin-bottom: 14px;
   }
@@ -2264,6 +2265,38 @@ noscript {
 
   .client-page .client-section-copy small {
     max-width: calc(100vw - 105px);
+  }
+
+  .client-page .action-bar-inner {
+    min-height: 78px;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+  }
+
+  .client-page .save-state {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .client-page .save-state small {
+    display: none;
+  }
+
+  .client-page .action-buttons {
+    width: auto;
+    gap: 6px;
+  }
+
+  .client-page .action-buttons .button {
+    width: auto;
+    min-width: 86px;
+    padding: 8px 10px;
+  }
+
+  .client-page .user-identity {
+    display: none;
   }
 }
 
