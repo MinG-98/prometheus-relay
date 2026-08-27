@@ -1267,14 +1267,6 @@ pre {
   white-space: pre-line;
 }
 
-.password-dialog {
-  width: min(430px, calc(100% - 32px));
-}
-
-.password-form .field {
-  margin-bottom: 14px;
-}
-
 .password-error {
   margin: 2px 0 16px !important;
   color: var(--danger) !important;
