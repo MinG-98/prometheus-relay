@@ -190,10 +190,13 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text-faint);
-  font-size: 16px;
-  font-weight: 400;
-  line-height: 1;
   transition: transform 0.18s ease, background 0.16s ease;
+}
+
+.summary-chevron svg {
+  display: block;
+  width: 14px;
+  height: 14px;
 }
 
 .admin-collapsible[open] .summary-chevron {
