@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: prometheus-relay:local
+    image: ${PROMETHEUS_RELAY_IMAGE:-prometheus-relay:local}
     env_file:
       - ${PROMETHEUS_RELAY_ENV_FILE:-.env}
     environment:
@@ -23,7 +23,7 @@ services:
     restart: unless-stopped
 
   worker:
-    image: prometheus-relay:local
+    image: ${PROMETHEUS_RELAY_IMAGE:-prometheus-relay:local}
     env_file:
       - ${PROMETHEUS_RELAY_ENV_FILE:-.env}
     environment:
@@ -43,7 +43,7 @@ services:
     restart: "no"
 
   scheduler:
-    image: prometheus-relay:local
+    image: ${PROMETHEUS_RELAY_IMAGE:-prometheus-relay:local}
     env_file:
       - ${PROMETHEUS_RELAY_ENV_FILE:-.env}
     environment:
