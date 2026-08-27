@@ -2234,6 +2234,10 @@ noscript {
 }
 
 @media (max-width: 680px) {
+  .client-page {
+    padding-bottom: 96px;
+  }
+
   .client-page .client-section > summary {
     min-height: 78px;
     padding: 17px 16px;
