@@ -8,7 +8,7 @@
   <title>登录 · Prometheus Relay</title>
   <link rel="icon" href="static/mark.svg?v=20260822-2" type="image/svg+xml">
   <link rel="stylesheet" href="static/app.css?v=20260822-2">
-  <link rel="stylesheet" href="static/login.css?v=20260827-5">
+  <link rel="stylesheet" href="static/login.css?v=20260827-6">
   <script src="static/login.js?v=20260827-1" defer></script>
 </head>
 <body class="login-page">
@@ -36,7 +36,10 @@
           <span class="field-hint">控制台账号</span>
         </div>
         <div class="input-shell">
-          <span class="field-symbol user-symbol" aria-hidden="true"></span>
+          <svg class="field-symbol user-symbol" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <circle cx="10" cy="6.5" r="3.25" stroke="currentColor" stroke-width="1.5"></circle>
+            <path d="M4.25 17a5.75 5.75 0 0 1 11.5 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
+          </svg>
           <input id="username" name="username" type="text" autocomplete="username" required maxlength="64" placeholder="输入用户名" autofocus>
         </div>
       </div>
