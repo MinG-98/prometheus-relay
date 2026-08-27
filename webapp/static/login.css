@@ -93,12 +93,6 @@
   line-height: 1.2;
 }
 
-.login-panel-heading > p:last-child {
-  margin: 10px 0 0;
-  color: var(--text-soft);
-  font-size: 13px;
-}
-
 .login-form {
   display: grid;
   gap: 18px;
@@ -306,14 +300,6 @@
   color: var(--text-soft);
   font-size: 11px;
   line-height: 1.65;
-}
-
-.login-note {
-  margin: 17px 0 0;
-  color: var(--text-faint);
-  font-size: 10px;
-  line-height: 1.7;
-  text-align: center;
 }
 
 @media (max-width: 520px) {
