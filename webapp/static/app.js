@@ -213,7 +213,11 @@
   function renderViewer() {
     const viewer = appState?.viewer || {};
     $("userDisplayName").textContent = viewer.displayName || viewer.username || "客户控制台";
-    $("userRoleLabel").textContent = viewerIsAdmin() ? "管理员" : "客户工作区";
+    const roleLabel = viewerIsAdmin() ? "管理员" : "客户工作区";
+    $("userRoleLabel").textContent = roleLabel;
+    $("accountSettingsUsername").textContent = viewer.username || "—";
+    $("accountSettingsDisplayName").textContent = viewer.displayName || viewer.username || "—";
+    $("accountSettingsRole").textContent = roleLabel;
   }
 
   function configureRoleVisibility() {
@@ -1491,15 +1495,6 @@
     updateScheduleSummary();
   }
 
-  function openPasswordDialog() {
-    const dialog = $("passwordDialog");
-    $("passwordForm").reset();
-    $("passwordError").hidden = true;
-    if (typeof dialog.showModal === "function") dialog.showModal();
-    else dialog.setAttribute("open", "open");
-    window.setTimeout(() => $("newPassword").focus(), 0);
-  }
-
   async function submitPassword(event) {
     event.preventDefault();
     const password = $("newPassword").value;
@@ -1520,14 +1515,14 @@
     }
     const button = $("passwordSubmit");
     button.disabled = true;
-    button.textContent = "保存中…";
+    button.textContent = "更新中…";
     try {
       const response = await api("api/auth/password", {
         method: "POST",
         body: JSON.stringify({ password }),
       });
       if (!response.ok) throw new Error(await responseError(response));
-      $("passwordDialog").close();
+      $("passwordForm").reset();
       showToast("密码已修改，请使用新密码重新登录");
       window.setTimeout(() => window.location.assign("/login"), 700);
     } catch (submitError) {
@@ -1535,7 +1530,7 @@
       error.hidden = false;
     } finally {
       button.disabled = false;
-      button.textContent = "保存新密码";
+      button.textContent = "更新密码";
     }
   }
 
@@ -1553,7 +1548,7 @@
       const target = event.target;
       if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement)) return;
       if (target.type === "file") return;
-      if (target.closest("#qrDialog")) {
+      if (target.closest("#qrDialog, #passwordForm")) {
         target.classList.remove("invalid");
         return;
       }
@@ -1569,7 +1564,7 @@
       const target = event.target;
       if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) return;
       if (target.type === "file") return;
-      if (target.closest("#qrDialog")) return;
+      if (target.closest("#qrDialog, #passwordForm")) return;
       target.classList.remove("invalid");
       setDirty(true);
       if (target.id === "scheduleEnabled") toggleScheduleFields();
@@ -1577,10 +1572,8 @@
     });
 
     $("scheduleTime").addEventListener("blur", normaliseTimeField);
-    $("changePassword").addEventListener("click", openPasswordDialog);
     $("logout").addEventListener("click", logout);
     $("passwordForm").addEventListener("submit", submitPassword);
-    $("passwordCancel").addEventListener("click", () => $("passwordDialog").close());
     $("scanAccount").addEventListener("click", beginQrLogin);
     $("addAccount").addEventListener("click", addAccount);
     $("qrRestart").addEventListener("click", restartQrLogin);

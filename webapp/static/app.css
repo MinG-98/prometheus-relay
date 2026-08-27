@@ -2313,3 +2313,103 @@ noscript {
     width: 100%;
   }
 }
+
+.client-page .account-settings-panel {
+  margin-top: 18px;
+}
+
+.client-page .account-settings-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.72fr) minmax(0, 1.28fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.client-page .account-profile-card {
+  padding: 17px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface-muted);
+}
+
+.client-page .account-profile-card .form-section-title,
+.client-page .account-security-heading .form-section-title {
+  margin-top: 0;
+}
+
+.client-page .account-profile-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.client-page .account-profile-row {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.client-page .account-profile-row:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.client-page .account-profile-row dt {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.client-page .account-profile-row dd {
+  overflow: hidden;
+  margin: 0;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.client-page .account-password-form {
+  min-width: 0;
+}
+
+.client-page .account-security-heading .section-description {
+  margin-top: 0;
+}
+
+.client-page .account-password-form .form-grid {
+  margin-top: 18px;
+}
+
+.client-page .account-password-form .field {
+  margin-bottom: 0;
+}
+
+.client-page .account-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.client-page .account-settings-actions .button {
+  min-width: 112px;
+}
+
+@media (max-width: 680px) {
+  .client-page .account-settings-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .client-page .account-settings-actions {
+    justify-content: stretch;
+  }
+
+  .client-page .account-settings-actions .button {
+    width: 100%;
+  }
+}
