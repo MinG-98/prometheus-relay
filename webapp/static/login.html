@@ -8,105 +8,69 @@
   <title>登录 · Prometheus Relay</title>
   <link rel="icon" href="static/mark.svg?v=20260822-2" type="image/svg+xml">
   <link rel="stylesheet" href="static/app.css?v=20260822-2">
-  <link rel="stylesheet" href="static/login.css?v=20260827-1">
+  <link rel="stylesheet" href="static/login.css?v=20260827-2">
   <script src="static/login.js?v=20260827-1" defer></script>
 </head>
 <body class="login-page">
-  <main class="login-layout">
-    <section class="login-showcase" aria-labelledby="showcaseTitle">
-      <span class="showcase-orbit orbit-one" aria-hidden="true"></span>
-      <span class="showcase-orbit orbit-two" aria-hidden="true"></span>
+  <main class="login-card" aria-labelledby="loginTitle">
+    <header class="login-card-header">
+      <a class="login-brand" href="/login" aria-label="Prometheus Relay 登录页">
+        <img class="brand-mark" src="static/mark.svg?v=20260822-2" alt="">
+        <span>
+          <strong>Prometheus Relay</strong>
+          <small>CONTROL CENTER</small>
+        </span>
+      </a>
+      <span class="login-security"><i class="status-dot" aria-hidden="true"></i>安全连接</span>
+    </header>
 
-      <div class="showcase-header">
-        <a class="login-brand" href="/login" aria-label="Prometheus Relay 登录页">
-          <img class="brand-mark" src="static/mark.svg?v=20260822-2" alt="">
-          <span>
-            <strong>Prometheus Relay</strong>
-            <small>KEEP THE FIRE ALIVE</small>
-          </span>
-        </a>
-        <span class="environment-badge"><i class="status-dot" aria-hidden="true"></i>私人控制台</span>
-      </div>
+    <div class="login-panel-heading">
+      <p class="eyebrow">控制台入口</p>
+      <h1 id="loginTitle">登录控制台</h1>
+      <p>使用管理员提供的账号进入对应工作区。</p>
+    </div>
 
-      <div class="showcase-copy">
-        <p class="showcase-kicker">Prometheus Relay / Control Center</p>
-        <h1 id="showcaseTitle">让每一簇火花，<strong>持续燃烧。</strong></h1>
-        <p>把账号、目标好友和定时任务放进一个清晰可靠的工作区，登录后即可继续管理。</p>
-      </div>
-
-      <div class="showcase-features" aria-label="控制台特点">
-        <article class="feature-card">
-          <span class="feature-index">01</span>
-          <div>
-            <h2>独立工作区</h2>
-            <p>每位客户只能看到自己的账号和任务。</p>
-          </div>
-        </article>
-        <article class="feature-card">
-          <span class="feature-index">02</span>
-          <div>
-            <h2>安全接入</h2>
-            <p>扫码与 Cookie 在服务端完成安全处理。</p>
-          </div>
-        </article>
-      </div>
-
-      <p class="showcase-footnote"><span aria-hidden="true">✓</span> 安全会话 · 数据按工作区隔离</p>
-    </section>
-
-    <section class="login-panel" aria-labelledby="loginTitle">
-      <div class="login-panel-inner">
-        <div class="login-panel-heading">
-          <p class="eyebrow">安全入口</p>
-          <h2 id="loginTitle">登录你的控制台</h2>
-          <p>使用管理员提供的账号进入对应工作区。</p>
+    <form id="loginForm" class="login-form" novalidate>
+      <div class="field login-field">
+        <div class="label-row">
+          <label for="username">用户名</label>
+          <span class="field-hint">控制台账号</span>
         </div>
-
-        <form id="loginForm" class="login-form" novalidate>
-          <div class="field login-field">
-            <div class="label-row">
-              <label for="username">用户名</label>
-              <span class="field-hint">控制台账号</span>
-            </div>
-            <div class="input-shell">
-              <span class="field-symbol user-symbol" aria-hidden="true"></span>
-              <input id="username" name="username" type="text" autocomplete="username" required maxlength="64" placeholder="输入用户名" autofocus>
-            </div>
-          </div>
-
-          <div class="field login-field">
-            <div class="label-row">
-              <label for="password">密码</label>
-              <span class="field-hint">区分大小写</span>
-            </div>
-            <div class="input-shell">
-              <span class="field-symbol lock-symbol" aria-hidden="true"></span>
-              <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="256" placeholder="输入密码">
-              <button id="passwordToggle" class="password-toggle" type="button" aria-controls="password" aria-label="显示密码" aria-pressed="false">显示</button>
-            </div>
-          </div>
-
-          <p id="loginError" class="login-error" role="alert" aria-live="assertive" hidden>
-            <span class="error-mark" aria-hidden="true">!</span>
-            <span id="loginErrorText"></span>
-          </p>
-
-          <button id="loginButton" class="button primary login-submit" type="submit">
-            <span id="loginButtonLabel">进入控制台</span>
-            <span id="loginButtonSpinner" class="button-spinner" aria-hidden="true" hidden></span>
-            <span id="loginButtonArrow" class="button-arrow" aria-hidden="true">→</span>
-          </button>
-        </form>
-
-        <div class="login-divider"><span>登录后继续</span></div>
-
-        <div class="login-help">
-          <span class="help-mark" aria-hidden="true">?</span>
-          <p><strong>第一次使用？</strong> 请联系管理员创建客户账号。抖音扫码、短信验证和任务配置会在进入控制台后完成。</p>
+        <div class="input-shell">
+          <span class="field-symbol user-symbol" aria-hidden="true"></span>
+          <input id="username" name="username" type="text" autocomplete="username" required maxlength="64" placeholder="输入用户名" autofocus>
         </div>
-        <p class="login-note">请勿在公共设备上保存密码。Cookie 不会显示在网页中，仅在服务端加密保存。</p>
       </div>
-    </section>
+
+      <div class="field login-field">
+        <div class="label-row">
+          <label for="password">密码</label>
+          <span class="field-hint">区分大小写</span>
+        </div>
+        <div class="input-shell">
+          <span class="field-symbol lock-symbol" aria-hidden="true"></span>
+          <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="256" placeholder="输入密码">
+          <button id="passwordToggle" class="password-toggle" type="button" aria-controls="password" aria-label="显示密码" aria-pressed="false">显示</button>
+        </div>
+      </div>
+
+      <p id="loginError" class="login-error" role="alert" aria-live="assertive" hidden>
+        <span class="error-mark" aria-hidden="true">!</span>
+        <span id="loginErrorText"></span>
+      </p>
+
+      <button id="loginButton" class="button primary login-submit" type="submit">
+        <span id="loginButtonLabel">登录</span>
+        <span id="loginButtonSpinner" class="button-spinner" aria-hidden="true" hidden></span>
+        <span id="loginButtonArrow" class="button-arrow" aria-hidden="true">→</span>
+      </button>
+    </form>
+
+    <div class="login-help">
+      <span class="help-mark" aria-hidden="true">?</span>
+      <p>需要账号？请联系管理员创建客户账号。</p>
+    </div>
+    <p class="login-note">Cookie 不会显示在网页中，仅在服务端加密保存。</p>
   </main>
 </body>
 </html>
