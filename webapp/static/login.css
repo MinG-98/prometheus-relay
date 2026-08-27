@@ -21,16 +21,6 @@
   box-shadow: 0 20px 58px rgba(33, 42, 70, 0.11);
 }
 
-.login-card::before {
-  position: absolute;
-  top: 0;
-  right: 0;
-  left: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--primary), #ffad24);
-  content: "";
-}
-
 .login-card-header,
 .login-brand,
 .login-security {
